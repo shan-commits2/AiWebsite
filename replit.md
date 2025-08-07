@@ -1,6 +1,6 @@
 # Overview
 
-This is a full-stack AI chat application built with React, Express, and PostgreSQL. The application provides a ChatGPT-like interface where users can have conversations with Google's Gemini AI model. Users can create multiple conversations, send messages, and receive AI-generated responses. The application features a responsive design with a sidebar for conversation management and a main chat interface.
+This is a full-stack AI chat application built with React, Express, and PostgreSQL. The application provides a ChatGPT-like interface where users can have conversations with Google's Gemini AI model. Users can create multiple conversations, send messages, and receive AI-generated responses. The application features a modern gray-themed responsive design with enhanced UI elements, syntax highlighting for code blocks, and smooth animations including typing indicators.
 
 # User Preferences
 
@@ -61,8 +61,11 @@ The application currently uses a simplified user management system:
 
 ## UI and Design System
 - **Radix UI**: Comprehensive set of low-level UI primitives for building accessible components
-- **Tailwind CSS**: Utility-first CSS framework for responsive design and theming
+- **Tailwind CSS**: Utility-first CSS framework with custom gray theme and gradient effects
 - **Lucide Icons**: Modern icon library for consistent iconography throughout the application
+- **React Markdown**: Markdown rendering with syntax highlighting support
+- **React Syntax Highlighter**: Code syntax highlighting with Prism.js and oneDark theme
+- **Framer Motion**: Smooth animations and transitions for enhanced user experience
 
 ## Development and Build Tools
 - **TypeScript**: Full TypeScript support across frontend and backend
@@ -72,5 +75,21 @@ The application currently uses a simplified user management system:
 
 ## Runtime and Hosting
 - **Node.js**: Server runtime environment with ES modules support
-- **Environment Variables**: Configurable through environment variables for different deployment environments
+- **Environment Variables**: Configurable through Replit Secrets system for secure API key management
 - **Production Build**: Optimized builds with proper static asset serving and API routing
+
+# Recent Updates (August 2025)
+
+## Enhanced UI and User Experience
+- **Modern Gray Theme**: Implemented sophisticated dark gray color scheme with blue user bubbles and green AI bubbles
+- **Syntax Highlighting**: Added full syntax highlighting support for code blocks in chat messages using react-syntax-highlighter
+- **Improved Animations**: Enhanced typing indicators and smooth transitions throughout the interface
+- **Better Chat Flow**: User messages now appear immediately before AI starts typing, providing better visual feedback
+- **Gradient Elements**: Added gradient backgrounds for branding and visual appeal
+
+## Technical Improvements
+- **Optimistic Updates**: Implemented optimistic UI updates for instant message display
+- **Enhanced Markdown Support**: Full markdown rendering with GitHub Flavored Markdown support
+- **Backdrop Blur Effects**: Added modern glass morphism effects with backdrop blur
+- **Responsive Design**: Improved mobile experience with better sidebar behavior
+- **Component Architecture**: Restructured chat components for better maintainability

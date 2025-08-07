@@ -30,10 +30,51 @@ export default function Chat() {
       });
       return response.json();
     },
-    onMutate: () => {
-      setIsTyping(true);
+    onMutate: async ({ conversationId, content }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ 
+        queryKey: ["/api/conversations", conversationId, "messages"] 
+      });
+
+      // Snapshot the previous value
+      const previousMessages = queryClient.getQueryData(["/api/conversations", conversationId, "messages"]);
+
+      // Optimistically add user message
+      const tempUserMessage = {
+        id: `temp-${Date.now()}`,
+        conversationId,
+        role: "user" as const,
+        content,
+        timestamp: new Date(),
+      };
+
+      queryClient.setQueryData(["/api/conversations", conversationId, "messages"], (old: any[]) => 
+        old ? [...old, tempUserMessage] : [tempUserMessage]
+      );
+
+      // Start typing indicator after showing user message
+      setTimeout(() => setIsTyping(true), 100);
+
+      return { previousMessages };
+    },
+    onError: (err, variables, context) => {
+      // Revert the optimistic update
+      if (context?.previousMessages) {
+        queryClient.setQueryData(
+          ["/api/conversations", variables.conversationId, "messages"], 
+          context.previousMessages
+        );
+      }
+      
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Send message error:", err);
     },
     onSuccess: (data) => {
+      // Update with actual server data
       queryClient.invalidateQueries({ 
         queryKey: ["/api/conversations", selectedConversationId, "messages"] 
       });
@@ -48,14 +89,6 @@ export default function Chat() {
           variant: "destructive",
         });
       }
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to send message. Please try again.",
-        variant: "destructive",
-      });
-      console.error("Send message error:", error);
     },
     onSettled: () => {
       setIsTyping(false);
@@ -105,12 +138,28 @@ export default function Chat() {
             <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
               {!selectedConversationId ? (
                 // Welcome message
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <MessageSquare className="h-8 w-8 text-white" />
+                <div className="text-center py-16">
+                  <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-green-500 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-2xl animate-pulse">
+                    <MessageSquare className="h-10 w-10 text-white" />
                   </div>
-                  <h2 className="text-2xl font-semibold mb-2">Welcome to Gemini Chat</h2>
-                  <p className="text-gray-400">Start a conversation and experience the power of AI</p>
+                  <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-green-400 bg-clip-text text-transparent">
+                    Welcome to Gemini Chat
+                  </h2>
+                  <p className="text-gray-400 text-lg mb-8">Start a conversation and experience the power of Google AI</p>
+                  <div className="flex flex-wrap justify-center gap-3 text-sm text-gray-500">
+                    <div className="flex items-center space-x-2 bg-gray-800/50 px-3 py-2 rounded-lg">
+                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                      <span>Code assistance</span>
+                    </div>
+                    <div className="flex items-center space-x-2 bg-gray-800/50 px-3 py-2 rounded-lg">
+                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                      <span>Creative writing</span>
+                    </div>
+                    <div className="flex items-center space-x-2 bg-gray-800/50 px-3 py-2 rounded-lg">
+                      <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                      <span>Problem solving</span>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 // Messages

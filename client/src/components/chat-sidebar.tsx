@@ -69,40 +69,47 @@ export function ChatSidebar({
   return (
     <>
       {/* Mobile header */}
-      <div className="md:hidden bg-gray-800 border-b border-gray-700 p-4 flex items-center justify-between">
+      <div className="md:hidden bg-gray-800/95 backdrop-blur-sm border-b border-gray-700/50 p-4 flex items-center justify-between shadow-lg">
         <Button
           variant="ghost"
           size="sm"
           onClick={onToggle}
-          className="p-2 hover:bg-gray-700"
+          className="p-2 hover:bg-gray-700/70 rounded-lg transition-all duration-200"
         >
-          <Menu className="h-5 w-5 text-gray-400" />
+          <Menu className="h-5 w-5 text-gray-300" />
         </Button>
-        <h1 className="text-lg font-semibold">Gemini Chat</h1>
+        <h1 className="text-lg font-semibold bg-gradient-to-r from-blue-400 to-green-400 bg-clip-text text-transparent">
+          Gemini Chat
+        </h1>
         <Button
           variant="ghost"
           size="sm"
           onClick={handleNewChat}
-          className="p-2 hover:bg-gray-700"
+          className="p-2 hover:bg-gray-700/70 rounded-lg transition-all duration-200"
           disabled={createConversationMutation.isPending}
         >
-          <Plus className="h-5 w-5 text-gray-400" />
+          <Plus className="h-5 w-5 text-gray-300" />
         </Button>
       </div>
 
       {/* Sidebar */}
       <div className={cn(
-        "bg-gray-800 border-r border-gray-700 flex flex-col transition-all duration-300",
-        "md:flex md:w-64",
+        "bg-gray-800/95 backdrop-blur-sm border-r border-gray-700/50 flex flex-col transition-all duration-300 shadow-xl",
+        "md:flex md:w-72",
         isOpen ? "flex" : "hidden"
       )}>
         {/* Desktop Header */}
-        <div className="hidden md:block p-4 border-b border-gray-700">
+        <div className="hidden md:block p-6 border-b border-gray-700/50">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
-              <MessageSquare className="h-4 w-4 text-white" />
+            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-green-500 rounded-xl flex items-center justify-center shadow-lg">
+              <MessageSquare className="h-5 w-5 text-white" />
             </div>
-            <h1 className="text-lg font-semibold">Gemini Chat</h1>
+            <div>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-green-400 bg-clip-text text-transparent">
+                Gemini Chat
+              </h1>
+              <p className="text-xs text-gray-400">Powered by Google AI</p>
+            </div>
           </div>
         </div>
         
@@ -111,11 +118,11 @@ export function ChatSidebar({
           <Button 
             onClick={handleNewChat}
             disabled={createConversationMutation.isPending}
-            className="w-full bg-gray-750 hover:bg-gray-600 text-white border-gray-600 justify-start"
+            className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white border-none justify-start shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
             variant="outline"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            New Chat
+            <Plus className="h-4 w-4 mr-3" />
+            <span className="font-medium">New Chat</span>
           </Button>
         </div>
         
@@ -131,30 +138,34 @@ export function ChatSidebar({
                 <div
                   key={conversation.id}
                   className={cn(
-                    "p-3 hover:bg-gray-750 rounded-lg cursor-pointer transition-colors duration-150 group",
-                    selectedConversationId === conversation.id && "bg-gray-700"
+                    "p-3 hover:bg-gray-700/50 rounded-xl cursor-pointer transition-all duration-200 group hover:shadow-md transform hover:scale-[1.01]",
+                    selectedConversationId === conversation.id && "bg-gradient-to-r from-blue-600/20 to-green-600/20 border border-blue-500/30"
                   )}
                   onClick={() => onSelectConversation(conversation.id)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-200 truncate">
+                      <p className={cn(
+                        "text-sm font-medium truncate transition-colors",
+                        selectedConversationId === conversation.id ? "text-blue-300" : "text-gray-200"
+                      )}>
                         {conversation.title}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {formatTimeAgo(conversation.updatedAt)}
+                      <p className="text-xs text-gray-400 mt-1 flex items-center space-x-1">
+                        <div className="w-1 h-1 bg-gray-500 rounded-full"></div>
+                        <span>{formatTimeAgo(conversation.updatedAt)}</span>
                       </p>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-600"
+                      className="opacity-0 group-hover:opacity-100 transition-all p-1 hover:bg-red-500/20 hover:text-red-400 rounded-lg"
                       onClick={(e) => {
                         e.stopPropagation();
                         deleteConversationMutation.mutate(conversation.id);
                       }}
                     >
-                      <MoreHorizontal className="h-3 w-3 text-gray-400" />
+                      <MoreHorizontal className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
@@ -164,16 +175,19 @@ export function ChatSidebar({
         </ScrollArea>
         
         {/* User Profile */}
-        <div className="p-4 border-t border-gray-700">
+        <div className="p-4 border-t border-gray-700/50 bg-gray-800/50">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-              <User className="h-4 w-4 text-white" />
+            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center shadow-lg">
+              <User className="h-5 w-5 text-white" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium">User</p>
-              <p className="text-xs text-gray-400">Free Plan</p>
+              <p className="text-sm font-medium text-gray-200">Anonymous User</p>
+              <p className="text-xs text-gray-400 flex items-center space-x-1">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span>Online</span>
+              </p>
             </div>
-            <Button variant="ghost" size="sm" className="p-1 hover:bg-gray-750">
+            <Button variant="ghost" size="sm" className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors">
               <Settings className="h-4 w-4 text-gray-400" />
             </Button>
           </div>

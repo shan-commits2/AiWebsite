@@ -91,6 +91,26 @@
   .gray-850 {
     background-color: hsl(217, 33%, 17%);
   }
+
+  /* Markdown prose styling for dark theme */
+  .prose-invert {
+    --tw-prose-body: hsl(210, 40%, 98%);
+    --tw-prose-headings: hsl(210, 40%, 98%);
+    --tw-prose-lead: hsl(215, 20%, 65%);
+    --tw-prose-links: hsl(217, 91%, 60%);
+    --tw-prose-bold: hsl(210, 40%, 98%);
+    --tw-prose-counters: hsl(215, 20%, 65%);
+    --tw-prose-bullets: hsl(215, 20%, 65%);
+    --tw-prose-hr: hsl(217, 32%, 17%);
+    --tw-prose-quotes: hsl(210, 40%, 98%);
+    --tw-prose-quote-borders: hsl(217, 32%, 17%);
+    --tw-prose-captions: hsl(215, 20%, 65%);
+    --tw-prose-code: hsl(210, 40%, 98%);
+    --tw-prose-pre-code: hsl(215, 20%, 65%);
+    --tw-prose-pre-bg: hsl(217, 32%, 17%);
+    --tw-prose-th-borders: hsl(217, 32%, 17%);
+    --tw-prose-td-borders: hsl(217, 32%, 17%);
+  }
 }
 
 @layer utilities {

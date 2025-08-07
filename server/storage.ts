@@ -63,6 +63,7 @@ export class MemStorage implements IStorage {
     const conversation: Conversation = {
       ...insertConversation,
       id,
+      model: insertConversation.model || "gemini-1.5-flash",
       createdAt: now,
       updatedAt: now,
     };

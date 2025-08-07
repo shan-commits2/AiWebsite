@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, MessageSquare, Settings, User, MoreHorizontal, Menu } from "lucide-react";
+import { Plus, MessageSquare, Settings, User, MoreHorizontal, Menu, Brain } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import { type Conversation } from "@shared/schema";
+import { type Conversation, GEMINI_MODELS, type GeminiModel } from "@shared/schema";
+import { ModelSelector } from "@/components/model-selector";
 import { cn } from "@/lib/utils";
 
 interface ChatSidebarProps {
@@ -13,6 +14,8 @@ interface ChatSidebarProps {
   onNewChat: () => void;
   isOpen: boolean;
   onToggle: () => void;
+  selectedModel: GeminiModel;
+  onModelChange: (model: GeminiModel) => void;
 }
 
 export function ChatSidebar({ 
@@ -20,7 +23,9 @@ export function ChatSidebar({
   onSelectConversation, 
   onNewChat,
   isOpen,
-  onToggle 
+  onToggle,
+  selectedModel,
+  onModelChange
 }: ChatSidebarProps) {
   const queryClient = useQueryClient();
 
@@ -31,7 +36,8 @@ export function ChatSidebar({
   const createConversationMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/conversations", {
-        title: "New Conversation"
+        title: "New Conversation",
+        model: selectedModel
       });
       return response.json();
     },
@@ -113,8 +119,8 @@ export function ChatSidebar({
           </div>
         </div>
         
-        {/* New Chat Button */}
-        <div className="p-4">
+        {/* New Chat Button & Model Selector */}
+        <div className="p-4 space-y-3">
           <Button 
             onClick={handleNewChat}
             disabled={createConversationMutation.isPending}
@@ -124,6 +130,15 @@ export function ChatSidebar({
             <Plus className="h-4 w-4 mr-3" />
             <span className="font-medium">New Chat</span>
           </Button>
+          
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400 font-medium">AI Model</span>
+            <ModelSelector
+              selectedModel={selectedModel}
+              onModelChange={onModelChange}
+              disabled={createConversationMutation.isPending}
+            />
+          </div>
         </div>
         
         {/* Conversations List */}
@@ -151,10 +166,15 @@ export function ChatSidebar({
                       )}>
                         {conversation.title}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1 flex items-center space-x-1">
-                        <div className="w-1 h-1 bg-gray-500 rounded-full"></div>
-                        <span>{formatTimeAgo(conversation.updatedAt)}</span>
-                      </p>
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-xs text-gray-400 flex items-center space-x-1">
+                          <div className="w-1 h-1 bg-gray-500 rounded-full"></div>
+                          <span>{formatTimeAgo(conversation.updatedAt)}</span>
+                        </p>
+                        <span className="text-xs text-gray-500 bg-gray-700/50 px-2 py-0.5 rounded-md">
+                          {GEMINI_MODELS[conversation.model as GeminiModel]?.name.split(' ')[1] || 'Flash'}
+                        </span>
+                      </div>
                     </div>
                     <Button
                       variant="ghost"

@@ -79,13 +79,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If this is the first user message, generate a title
       const messages = await storage.getMessages(conversationId);
       if (messages.filter(m => m.role === 'user').length === 1) {
-        const title = await generateConversationTitle(validatedData.content);
+        const title = await generateConversationTitle(validatedData.content, conversation.model);
         await storage.updateConversation(conversationId, { title });
       }
 
-      // Generate AI response
+      // Generate AI response using the conversation's model
       try {
-        const aiResponse = await generateChatResponse(validatedData.content);
+        const aiResponse = await generateChatResponse(validatedData.content, conversation.model);
         
         // Create AI message
         const aiMessage = await storage.createMessage({

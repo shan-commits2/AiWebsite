@@ -6,13 +6,14 @@ import { ChatInput } from "@/components/chat-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageSquare } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import { type Message } from "@shared/schema";
+import { type Message, type GeminiModel } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Chat() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const [isTyping, setIsTyping] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<GeminiModel>("gemini-1.5-flash");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -130,6 +131,8 @@ export default function Chat() {
         onNewChat={handleNewChat}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
+        selectedModel={selectedModel}
+        onModelChange={setSelectedModel}
       />
       
       <div className="flex-1 flex flex-col">

@@ -6,6 +6,7 @@ import { z } from "zod";
 export const conversations = pgTable("conversations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
+  model: varchar("model").default("gemini-1.5-flash").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -20,7 +21,32 @@ export const messages = pgTable("messages", {
 
 export const insertConversationSchema = createInsertSchema(conversations).pick({
   title: true,
+  model: true,
 });
+
+// Available Gemini models (free tier)
+export const GEMINI_MODELS = {
+  "gemini-1.5-flash": {
+    name: "Gemini 1.5 Flash",
+    description: "Fast responses, great for general tasks",
+    speed: "Fast",
+    capabilities: ["Text", "Code", "Math"]
+  },
+  "gemini-2.0-flash-exp": {
+    name: "Gemini 2.0 Flash",
+    description: "Latest model with enhanced capabilities",
+    speed: "Fast", 
+    capabilities: ["Text", "Code", "Math", "Reasoning"]
+  },
+  "gemini-2.5-flash": {
+    name: "Gemini 2.5 Flash",
+    description: "Advanced model with thinking capabilities",
+    speed: "Fast",
+    capabilities: ["Text", "Code", "Math", "Reasoning", "Thinking"]
+  }
+} as const;
+
+export type GeminiModel = keyof typeof GEMINI_MODELS;
 
 export const insertMessageSchema = createInsertSchema(messages).pick({
   conversationId: true,

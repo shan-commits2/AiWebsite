@@ -4,14 +4,14 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || "" 
 });
 
-export async function generateChatResponse(message: string): Promise<string> {
+export async function generateChatResponse(message: string, model: string = "gemini-1.5-flash"): Promise<string> {
   try {
     if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_AI_API_KEY) {
       throw new Error("Gemini API key not configured");
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: model,
       contents: message,
     });
 
@@ -22,12 +22,12 @@ export async function generateChatResponse(message: string): Promise<string> {
   }
 }
 
-export async function generateConversationTitle(firstMessage: string): Promise<string> {
+export async function generateConversationTitle(firstMessage: string, model: string = "gemini-1.5-flash"): Promise<string> {
   try {
     const prompt = `Generate a short, descriptive title (max 6 words) for a conversation that starts with: "${firstMessage}". Only return the title, nothing else.`;
     
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: model,
       contents: prompt,
     });
 

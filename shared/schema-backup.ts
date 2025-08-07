@@ -3,7 +3,6 @@ import { pgTable, text, varchar, timestamp, json, real, boolean, integer } from 
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Core conversation table with extended features
 export const conversations = pgTable("conversations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
@@ -17,7 +16,6 @@ export const conversations = pgTable("conversations", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Enhanced messages table with editing and reactions
 export const messages = pgTable("messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   conversationId: varchar("conversation_id").notNull().references(() => conversations.id, { onDelete: "cascade" }),
@@ -67,14 +65,6 @@ export const attachments = pgTable("attachments", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Simple users table
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-});
-
-// Insert schemas for validation
 export const insertConversationSchema = createInsertSchema(conversations).pick({
   title: true,
   model: true,
@@ -121,11 +111,7 @@ export const insertAttachmentSchema = createInsertSchema(attachments).pick({
   fileUrl: true,
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-});
-
+// Available Gemini models (free tier)
 // Available themes
 export const THEMES = {
   "dark-gray": { name: "Dark Gray", primary: "#374151", secondary: "#4B5563" },
@@ -135,7 +121,6 @@ export const THEMES = {
   "rose": { name: "Rose Pink", primary: "#E11D48", secondary: "#F43F5E" }
 } as const;
 
-// Available Gemini models with comprehensive info
 export const GEMINI_MODELS = {
   "gemini-1.5-flash": {
     name: "Gemini 1.5 Flash",
@@ -163,20 +148,44 @@ export const GEMINI_MODELS = {
   }
 } as const;
 
-// Type exports
 export type GeminiModel = keyof typeof GEMINI_MODELS;
 export type Theme = keyof typeof THEMES;
 
+// Type exports for all tables
 export type Conversation = typeof conversations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type UserSettings = typeof userSettings.$inferSelect;
 export type UsageStats = typeof usageStats.$inferSelect;
 export type Attachment = typeof attachments.$inferSelect;
-export type User = typeof users.$inferSelect;
+
+export type InsertConversation = typeof insertConversationSchema._type;
+export type InsertMessage = typeof insertMessageSchema._type;
+export type InsertUserSettings = typeof insertUserSettingsSchema._type;
+export type InsertUsageStats = typeof insertUsageStatsSchema._type;
+export type InsertAttachment = typeof insertAttachmentSchema._type;
+
+export const insertMessageSchema = createInsertSchema(messages).pick({
+  conversationId: true,
+  role: true,
+  content: true,
+});
 
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
-export type InsertUserSettings = z.infer<typeof insertUserSettingsSchema>;
-export type InsertUsageStats = z.infer<typeof insertUsageStatsSchema>;
-export type InsertAttachment = z.infer<typeof insertAttachmentSchema>;
+export type Message = typeof messages.$inferSelect;
+
+// Remove old user schema
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+});
+
+export const insertUserSchema = createInsertSchema(users).pick({
+  username: true,
+  password: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;

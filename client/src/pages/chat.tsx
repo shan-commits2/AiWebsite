@@ -3,10 +3,17 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChatSidebar } from "@/components/chat-sidebar";
 import { ChatMessage } from "@/components/chat-message";
 import { ChatInput } from "@/components/chat-input";
+import { ThemeSelector } from "@/components/theme-selector";
+import { ExportDialog } from "@/components/export-dialog";
+import { AnalyticsDashboard } from "@/components/analytics-dashboard";
+import { FileUpload } from "@/components/file-upload";
+import { VoiceInput } from "@/components/voice-input";
+import { ModelComparison } from "@/components/model-comparison";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { MessageSquare, Settings, Sparkles } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import { type Message, type GeminiModel } from "@shared/schema";
+import { type Message, type GeminiModel, type Theme, type Conversation } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Chat() {
@@ -14,9 +21,30 @@ export default function Chat() {
   const [isTyping, setIsTyping] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<GeminiModel>("gemini-1.5-flash");
+  const [selectedTheme, setSelectedTheme] = useState<Theme>("dark-gray");
+  const [showAdvancedPanel, setShowAdvancedPanel] = useState(false);
+  const [currentMessage, setCurrentMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Load user settings
+  const { data: userSettings } = useQuery({
+    queryKey: ["/api/settings"],
+  });
+
+  // Load current conversation
+  const { data: conversation } = useQuery<Conversation>({
+    queryKey: ["/api/conversations", selectedConversationId],
+    enabled: !!selectedConversationId,
+  });
+
+  // Update theme when user settings change
+  useEffect(() => {
+    if (userSettings?.theme) {
+      setSelectedTheme(userSettings.theme as Theme);
+    }
+  }, [userSettings]);
 
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: ["/api/conversations", selectedConversationId, "messages"],

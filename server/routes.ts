@@ -1,8 +1,10 @@
-import type { Express } from "express";
+import express, { type Express } from "express";
 import { createServer, type Server } from "http";
+import path from "path";
 import { storage } from "./storage";
 import { generateChatResponse, generateConversationTitle } from "./services/gemini";
 import { insertConversationSchema, insertMessageSchema } from "@shared/schema";
+import { upload, analyzeFile, getFileUrl } from "./services/upload";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -117,6 +119,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Message creation error:", error);
         res.status(500).json({ message: "Failed to create message" });
       }
+    }
+  });
+
+  // File upload endpoint
+  app.post("/api/upload", upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const analysis = await analyzeFile(
+        req.file.path, 
+        req.file.originalname, 
+        req.file.mimetype
+      );
+      
+      const fileUrl = getFileUrl(req.file.filename);
+      
+      res.json({
+        url: fileUrl,
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        type: req.file.mimetype,
+        analysis
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to upload file" });
+    }
+  });
+
+  // Serve uploaded files
+  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
+  // Update message (for editing, reactions, bookmarks)
+  app.patch("/api/messages/:id", async (req, res) => {
+    try {
+      const messageId = req.params.id;
+      const updates = req.body;
+      
+      const updatedMessage = await storage.updateMessage(messageId, updates);
+      if (updatedMessage) {
+        res.json(updatedMessage);
+      } else {
+        res.status(404).json({ message: "Message not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update message" });
+    }
+  });
+
+  // Model comparison endpoint
+  app.post("/api/chat/compare", async (req, res) => {
+    try {
+      const { message, model } = req.body;
+      
+      if (!message || !model) {
+        return res.status(400).json({ message: "Message and model are required" });
+      }
+
+      const startTime = Date.now();
+      const response = await generateChatResponse(message, model);
+      const responseTime = Date.now() - startTime;
+      
+      res.json({
+        response,
+        responseTime,
+        tokens: response.length, // Rough estimate
+        model
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to generate comparison response" });
+    }
+  });
+
+  // Analytics endpoints
+  app.get("/api/analytics/usage", async (_req, res) => {
+    try {
+      const stats = await storage.getUsageStats();
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
+  // User settings endpoints
+  app.get("/api/settings", async (_req, res) => {
+    try {
+      const settings = await storage.getUserSettings();
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch settings" });
+    }
+  });
+
+  app.patch("/api/settings", async (req, res) => {
+    try {
+      const updates = req.body;
+      const settings = await storage.updateUserSettings(updates);
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update settings" });
     }
   });
 

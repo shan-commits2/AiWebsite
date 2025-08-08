@@ -7,16 +7,34 @@ import { insertConversationSchema, insertMessageSchema } from "@shared/schema";
 import { upload, analyzeFile, getFileUrl } from "./services/upload";
 import { z } from "zod";
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  // GET all conversations (for this session)
-  app.get("/api/conversations", async (req, res) => {
-    console.log("GET /api/conversations called");
-    try {
-      const sessionId = req.query.sessionId as string;
-      if (!sessionId) return res.status(400).json({ message: "Missing sessionId" });
+// Middleware to attach sessionId from query, body, or headers
+function sessionIdMiddleware(req, res, next) {
+  const sessionId =
+    req.query.sessionId ||
+    req.body.sessionId ||
+    req.headers["sessionid"] ||
+    null;
 
-      const conversations = await storage.getConversations(sessionId);
-      console.log("Fetched conversations:", conversations);
+  if (!sessionId) {
+    return res.status(400).json({ message: "Missing sessionId" });
+  }
+
+  req.sessionId = String(sessionId);
+  next();
+}
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Apply sessionIdMiddleware to all /api routes except file uploads
+  app.use("/api", express.json(), (req, res, next) => {
+    // Skip for uploads since multer handles its own body parsing
+    if (req.path.startsWith("/upload")) return next();
+    sessionIdMiddleware(req, res, next);
+  });
+
+  // GET all conversations
+  app.get("/api/conversations", async (req, res) => {
+    try {
+      const conversations = await storage.getConversations(req.sessionId);
       res.json(conversations);
     } catch (error) {
       console.error("Error fetching conversations:", error);
@@ -26,20 +44,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // CREATE new conversation
   app.post("/api/conversations", async (req, res) => {
-    console.log("POST /api/conversations body:", req.body);
     try {
-      const sessionId = req.body.sessionId as string;
-      if (!sessionId) return res.status(400).json({ message: "Missing sessionId" });
-
       const validatedData = insertConversationSchema.parse({
         ...req.body,
-        sessionId
+        sessionId: req.sessionId,
       });
-      console.log("Validated conversation data:", validatedData);
-
       const conversation = await storage.createConversation(validatedData);
-      console.log("Created conversation:", conversation);
-
       res.status(201).json(conversation);
     } catch (error) {
       console.error("Error creating conversation:", error);
@@ -53,13 +63,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // DELETE conversation
   app.delete("/api/conversations/:id", async (req, res) => {
-    console.log("DELETE /api/conversations/:id", req.params.id);
     try {
-      const sessionId = req.query.sessionId as string;
-      if (!sessionId) return res.status(400).json({ message: "Missing sessionId" });
-
-      const success = await storage.deleteConversation(req.params.id, sessionId);
-      console.log("Delete success:", success);
+      const success = await storage.deleteConversation(req.params.id, req.sessionId);
       if (success) {
         res.json({ message: "Conversation deleted successfully" });
       } else {
@@ -73,13 +78,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // GET messages for a conversation
   app.get("/api/conversations/:id/messages", async (req, res) => {
-    console.log("GET messages for conversation:", req.params.id);
     try {
-      const sessionId = req.query.sessionId as string;
-      if (!sessionId) return res.status(400).json({ message: "Missing sessionId" });
-
-      const messages = await storage.getMessages(req.params.id, sessionId);
-      console.log("Fetched messages:", messages);
+      const messages = await storage.getMessages(req.params.id, req.sessionId);
       res.json(messages);
     } catch (error) {
       console.error("Error fetching messages:", error);
@@ -87,53 +87,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // SEND message and get AI response
+  // SEND message
   app.post("/api/conversations/:id/messages", async (req, res) => {
-    console.log("POST /api/conversations/:id/messages", "body:", req.body, "params:", req.params);
     try {
-      const sessionId = req.body.sessionId as string;
-      if (!sessionId) return res.status(400).json({ message: "Missing sessionId" });
-
       const conversationId = req.params.id;
-      const messageData = { ...req.body, conversationId, sessionId };
+      const messageData = { ...req.body, conversationId, sessionId: req.sessionId };
       const validatedData = insertMessageSchema.parse(messageData);
-      console.log("Validated message data:", validatedData);
 
-      const conversation = await storage.getConversation(conversationId, sessionId);
-      console.log("Fetched conversation:", conversation);
+      const conversation = await storage.getConversation(conversationId, req.sessionId);
       if (!conversation) {
         return res.status(404).json({ message: "Conversation not found" });
       }
 
       const userMessage = await storage.createMessage(validatedData);
-      console.log("Created user message:", userMessage);
+      await storage.updateConversation(conversationId, { updatedAt: new Date() }, req.sessionId);
 
-      await storage.updateConversation(conversationId, { updatedAt: new Date() }, sessionId);
-
-      const messages = await storage.getMessages(conversationId, sessionId);
-      if (messages.filter(m => m.role === 'user').length === 1) {
+      const messages = await storage.getMessages(conversationId, req.sessionId);
+      if (messages.filter(m => m.role === "user").length === 1) {
         const title = await generateConversationTitle(validatedData.content, conversation.model);
-        await storage.updateConversation(conversationId, { title }, sessionId);
-        console.log("Generated and updated title:", title);
+        await storage.updateConversation(conversationId, { title }, req.sessionId);
       }
 
       try {
         const aiResponse = await generateChatResponse(validatedData.content, conversation.model);
-        console.log("AI response:", aiResponse);
-
         const aiMessage = await storage.createMessage({
           conversationId,
-          sessionId,
+          sessionId: req.sessionId,
           role: "assistant",
           content: aiResponse,
         });
-        console.log("Created AI message:", aiMessage);
-
-        await storage.updateConversation(conversationId, { updatedAt: new Date() }, sessionId);
+        await storage.updateConversation(conversationId, { updatedAt: new Date() }, req.sessionId);
 
         res.status(201).json({ userMessage, aiMessage });
       } catch (aiError) {
-        console.error("Error generating AI response:", aiError);
         res.status(201).json({ userMessage, error: "Failed to generate AI response. Please try again." });
       }
     } catch (error) {
@@ -146,9 +132,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // FILE UPLOAD
+  // FILE UPLOAD (no sessionId check here by default)
   app.post("/api/upload", upload.single("file"), async (req, res) => {
-    console.log("POST /api/upload file:", req.file);
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -156,8 +141,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const analysis = await analyzeFile(req.file.path, req.file.originalname, req.file.mimetype);
       const fileUrl = getFileUrl(req.file.filename);
-
-      console.log("Upload analysis result:", analysis);
 
       res.json({
         url: fileUrl,
@@ -173,12 +156,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve uploaded files
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
   // UPDATE message
   app.patch("/api/messages/:id", async (req, res) => {
-    console.log("PATCH /api/messages/:id", req.params.id, "body:", req.body);
     try {
       const updatedMessage = await storage.updateMessage(req.params.id, req.body);
       if (updatedMessage) {
@@ -194,7 +175,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // MODEL COMPARISON
   app.post("/api/chat/compare", async (req, res) => {
-    console.log("POST /api/chat/compare body:", req.body);
     try {
       const { message, model } = req.body;
       if (!message || !model) {
@@ -214,11 +194,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ANALYTICS
   app.get("/api/analytics/usage", async (req, res) => {
-    console.log("GET /api/analytics/usage called");
     try {
-      const sessionId = req.query.sessionId as string;
-      const stats = await storage.getUsageStats(sessionId);
-      console.log("Fetched usage stats:", stats);
+      const stats = await storage.getUsageStats(req.sessionId);
       res.json(stats);
     } catch (error) {
       console.error("Error fetching analytics:", error);
@@ -228,11 +205,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // USER SETTINGS
   app.get("/api/settings", async (req, res) => {
-    console.log("GET /api/settings called");
     try {
-      const sessionId = req.query.sessionId as string;
-      const settings = await storage.getUserSettings(sessionId);
-      console.log("Fetched user settings:", settings);
+      const settings = await storage.getUserSettings(req.sessionId);
       res.json(settings);
     } catch (error) {
       console.error("Error fetching settings:", error);
@@ -241,11 +215,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.patch("/api/settings", async (req, res) => {
-    console.log("PATCH /api/settings body:", req.body);
     try {
-      const sessionId = req.body.sessionId as string;
-      const settings = await storage.updateUserSettings(req.body, sessionId);
-      console.log("Updated settings:", settings);
+      const settings = await storage.updateUserSettings(req.body, req.sessionId);
       res.json(settings);
     } catch (error) {
       console.error("Error updating settings:", error);

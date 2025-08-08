@@ -8,23 +8,32 @@ import { upload, analyzeFile, getFileUrl } from "./services/upload";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Get all conversations
+  // GET all conversations
   app.get("/api/conversations", async (_req, res) => {
+    console.log("GET /api/conversations called");
     try {
       const conversations = await storage.getConversations();
+      console.log("Fetched conversations:", conversations);
       res.json(conversations);
     } catch (error) {
+      console.error("Error fetching conversations:", error);
       res.status(500).json({ message: "Failed to fetch conversations" });
     }
   });
 
-  // Create new conversation
+  // CREATE new conversation
   app.post("/api/conversations", async (req, res) => {
+    console.log("POST /api/conversations body:", req.body);
     try {
       const validatedData = insertConversationSchema.parse(req.body);
+      console.log("Validated conversation data:", validatedData);
+
       const conversation = await storage.createConversation(validatedData);
+      console.log("Created conversation:", conversation);
+
       res.status(201).json(conversation);
     } catch (error) {
+      console.error("Error creating conversation:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ message: "Invalid conversation data", errors: error.errors });
       } else {
@@ -33,119 +42,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete conversation
+  // DELETE conversation
   app.delete("/api/conversations/:id", async (req, res) => {
+    console.log("DELETE /api/conversations/:id", req.params.id);
     try {
       const success = await storage.deleteConversation(req.params.id);
+      console.log("Delete success:", success);
       if (success) {
         res.json({ message: "Conversation deleted successfully" });
       } else {
         res.status(404).json({ message: "Conversation not found" });
       }
     } catch (error) {
+      console.error("Error deleting conversation:", error);
       res.status(500).json({ message: "Failed to delete conversation" });
     }
   });
 
-  // Get messages for a conversation
+  // GET messages for a conversation
   app.get("/api/conversations/:id/messages", async (req, res) => {
+    console.log("GET messages for conversation:", req.params.id);
     try {
       const messages = await storage.getMessages(req.params.id);
+      console.log("Fetched messages:", messages);
       res.json(messages);
     } catch (error) {
+      console.error("Error fetching messages:", error);
       res.status(500).json({ message: "Failed to fetch messages" });
     }
   });
 
-  // Send message and get AI response
+  // SEND message and get AI response
   app.post("/api/conversations/:id/messages", async (req, res) => {
+    console.log("POST /api/conversations/:id/messages", "body:", req.body, "params:", req.params);
     try {
       const conversationId = req.params.id;
       const messageData = { ...req.body, conversationId };
       const validatedData = insertMessageSchema.parse(messageData);
+      console.log("Validated message data:", validatedData);
 
-      // Verify conversation exists
       const conversation = await storage.getConversation(conversationId);
+      console.log("Fetched conversation:", conversation);
       if (!conversation) {
         return res.status(404).json({ message: "Conversation not found" });
       }
 
-      // Create user message
       const userMessage = await storage.createMessage(validatedData);
+      console.log("Created user message:", userMessage);
 
-      // Update conversation's updated time
-      await storage.updateConversation(conversationId, { 
-        updatedAt: new Date() 
-      });
+      await storage.updateConversation(conversationId, { updatedAt: new Date() });
 
-      // If this is the first user message, generate a title
       const messages = await storage.getMessages(conversationId);
       if (messages.filter(m => m.role === 'user').length === 1) {
         const title = await generateConversationTitle(validatedData.content, conversation.model);
         await storage.updateConversation(conversationId, { title });
+        console.log("Generated and updated title:", title);
       }
 
-      // Generate AI response using the conversation's model
       try {
         const aiResponse = await generateChatResponse(validatedData.content, conversation.model);
-        
-        // Create AI message
+        console.log("AI response:", aiResponse);
+
         const aiMessage = await storage.createMessage({
           conversationId,
           role: "assistant",
           content: aiResponse,
         });
+        console.log("Created AI message:", aiMessage);
 
-        // Update conversation timestamp again
-        await storage.updateConversation(conversationId, { 
-          updatedAt: new Date() 
-        });
+        await storage.updateConversation(conversationId, { updatedAt: new Date() });
 
-        res.status(201).json({
-          userMessage,
-          aiMessage,
-        });
+        res.status(201).json({ userMessage, aiMessage });
       } catch (aiError) {
-        // Return user message even if AI response fails
-        res.status(201).json({
-          userMessage,
-          error: "Failed to generate AI response. Please try again.",
-        });
+        console.error("Error generating AI response:", aiError);
+        res.status(201).json({ userMessage, error: "Failed to generate AI response. Please try again." });
       }
     } catch (error) {
+      console.error("Message creation error:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ message: "Invalid message data", errors: error.errors });
       } else {
-        console.error("Message creation error:", error);
         res.status(500).json({ message: "Failed to create message" });
       }
     }
   });
 
-  // File upload endpoint
+  // FILE UPLOAD
   app.post("/api/upload", upload.single("file"), async (req, res) => {
+    console.log("POST /api/upload file:", req.file);
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      const analysis = await analyzeFile(
-        req.file.path, 
-        req.file.originalname, 
-        req.file.mimetype
-      );
-      
+      const analysis = await analyzeFile(req.file.path, req.file.originalname, req.file.mimetype);
       const fileUrl = getFileUrl(req.file.filename);
-      
+
+      console.log("Upload analysis result:", analysis);
+
       res.json({
         url: fileUrl,
         filename: req.file.filename,
         originalName: req.file.originalname,
         size: req.file.size,
         type: req.file.mimetype,
-        analysis
+        analysis,
       });
     } catch (error) {
+      console.error("Error uploading file:", error);
       res.status(500).json({ message: "Failed to upload file" });
     }
   });
@@ -153,28 +157,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve uploaded files
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
-  // Update message (for editing, reactions, bookmarks)
+  // UPDATE message
   app.patch("/api/messages/:id", async (req, res) => {
+    console.log("PATCH /api/messages/:id", req.params.id, "body:", req.body);
     try {
-      const messageId = req.params.id;
-      const updates = req.body;
-      
-      const updatedMessage = await storage.updateMessage(messageId, updates);
+      const updatedMessage = await storage.updateMessage(req.params.id, req.body);
       if (updatedMessage) {
         res.json(updatedMessage);
       } else {
         res.status(404).json({ message: "Message not found" });
       }
     } catch (error) {
+      console.error("Error updating message:", error);
       res.status(500).json({ message: "Failed to update message" });
     }
   });
 
-  // Model comparison endpoint
+  // MODEL COMPARISON
   app.post("/api/chat/compare", async (req, res) => {
+    console.log("POST /api/chat/compare body:", req.body);
     try {
       const { message, model } = req.body;
-      
       if (!message || !model) {
         return res.status(400).json({ message: "Message and model are required" });
       }
@@ -182,44 +185,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startTime = Date.now();
       const response = await generateChatResponse(message, model);
       const responseTime = Date.now() - startTime;
-      
-      res.json({
-        response,
-        responseTime,
-        tokens: response.length, // Rough estimate
-        model
-      });
+
+      res.json({ response, responseTime, tokens: response.length, model });
     } catch (error) {
+      console.error("Error in chat compare:", error);
       res.status(500).json({ message: "Failed to generate comparison response" });
     }
   });
 
-  // Analytics endpoints
+  // ANALYTICS
   app.get("/api/analytics/usage", async (_req, res) => {
+    console.log("GET /api/analytics/usage called");
     try {
       const stats = await storage.getUsageStats();
+      console.log("Fetched usage stats:", stats);
       res.json(stats);
     } catch (error) {
+      console.error("Error fetching analytics:", error);
       res.status(500).json({ message: "Failed to fetch analytics" });
     }
   });
 
-  // User settings endpoints
+  // USER SETTINGS
   app.get("/api/settings", async (_req, res) => {
+    console.log("GET /api/settings called");
     try {
       const settings = await storage.getUserSettings();
+      console.log("Fetched user settings:", settings);
       res.json(settings);
     } catch (error) {
+      console.error("Error fetching settings:", error);
       res.status(500).json({ message: "Failed to fetch settings" });
     }
   });
 
   app.patch("/api/settings", async (req, res) => {
+    console.log("PATCH /api/settings body:", req.body);
     try {
-      const updates = req.body;
-      const settings = await storage.updateUserSettings(updates);
+      const settings = await storage.updateUserSettings(req.body);
+      console.log("Updated settings:", settings);
       res.json(settings);
     } catch (error) {
+      console.error("Error updating settings:", error);
       res.status(500).json({ message: "Failed to update settings" });
     }
   });

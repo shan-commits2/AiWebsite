@@ -8,11 +8,14 @@ import { upload, analyzeFile, getFileUrl } from "./services/upload";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // GET all conversations
-  app.get("/api/conversations", async (_req, res) => {
+  // GET all conversations (for this session)
+  app.get("/api/conversations", async (req, res) => {
     console.log("GET /api/conversations called");
     try {
-      const conversations = await storage.getConversations();
+      const sessionId = req.query.sessionId as string;
+      if (!sessionId) return res.status(400).json({ message: "Missing sessionId" });
+
+      const conversations = await storage.getConversations(sessionId);
       console.log("Fetched conversations:", conversations);
       res.json(conversations);
     } catch (error) {
@@ -25,7 +28,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/conversations", async (req, res) => {
     console.log("POST /api/conversations body:", req.body);
     try {
-      const validatedData = insertConversationSchema.parse(req.body);
+      const sessionId = req.body.sessionId as string;
+      if (!sessionId) return res.status(400).json({ message: "Missing sessionId" });
+
+      const validatedData = insertConversationSchema.parse({
+        ...req.body,
+        sessionId
+      });
       console.log("Validated conversation data:", validatedData);
 
       const conversation = await storage.createConversation(validatedData);
@@ -46,7 +55,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/conversations/:id", async (req, res) => {
     console.log("DELETE /api/conversations/:id", req.params.id);
     try {
-      const success = await storage.deleteConversation(req.params.id);
+      const sessionId = req.query.sessionId as string;
+      if (!sessionId) return res.status(400).json({ message: "Missing sessionId" });
+
+      const success = await storage.deleteConversation(req.params.id, sessionId);
       console.log("Delete success:", success);
       if (success) {
         res.json({ message: "Conversation deleted successfully" });
@@ -63,7 +75,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/conversations/:id/messages", async (req, res) => {
     console.log("GET messages for conversation:", req.params.id);
     try {
-      const messages = await storage.getMessages(req.params.id);
+      const sessionId = req.query.sessionId as string;
+      if (!sessionId) return res.status(400).json({ message: "Missing sessionId" });
+
+      const messages = await storage.getMessages(req.params.id, sessionId);
       console.log("Fetched messages:", messages);
       res.json(messages);
     } catch (error) {
@@ -76,12 +91,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/conversations/:id/messages", async (req, res) => {
     console.log("POST /api/conversations/:id/messages", "body:", req.body, "params:", req.params);
     try {
+      const sessionId = req.body.sessionId as string;
+      if (!sessionId) return res.status(400).json({ message: "Missing sessionId" });
+
       const conversationId = req.params.id;
-      const messageData = { ...req.body, conversationId };
+      const messageData = { ...req.body, conversationId, sessionId };
       const validatedData = insertMessageSchema.parse(messageData);
       console.log("Validated message data:", validatedData);
 
-      const conversation = await storage.getConversation(conversationId);
+      const conversation = await storage.getConversation(conversationId, sessionId);
       console.log("Fetched conversation:", conversation);
       if (!conversation) {
         return res.status(404).json({ message: "Conversation not found" });
@@ -90,12 +108,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userMessage = await storage.createMessage(validatedData);
       console.log("Created user message:", userMessage);
 
-      await storage.updateConversation(conversationId, { updatedAt: new Date() });
+      await storage.updateConversation(conversationId, { updatedAt: new Date() }, sessionId);
 
-      const messages = await storage.getMessages(conversationId);
+      const messages = await storage.getMessages(conversationId, sessionId);
       if (messages.filter(m => m.role === 'user').length === 1) {
         const title = await generateConversationTitle(validatedData.content, conversation.model);
-        await storage.updateConversation(conversationId, { title });
+        await storage.updateConversation(conversationId, { title }, sessionId);
         console.log("Generated and updated title:", title);
       }
 
@@ -105,12 +123,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const aiMessage = await storage.createMessage({
           conversationId,
+          sessionId,
           role: "assistant",
           content: aiResponse,
         });
         console.log("Created AI message:", aiMessage);
 
-        await storage.updateConversation(conversationId, { updatedAt: new Date() });
+        await storage.updateConversation(conversationId, { updatedAt: new Date() }, sessionId);
 
         res.status(201).json({ userMessage, aiMessage });
       } catch (aiError) {
@@ -194,10 +213,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ANALYTICS
-  app.get("/api/analytics/usage", async (_req, res) => {
+  app.get("/api/analytics/usage", async (req, res) => {
     console.log("GET /api/analytics/usage called");
     try {
-      const stats = await storage.getUsageStats();
+      const sessionId = req.query.sessionId as string;
+      const stats = await storage.getUsageStats(sessionId);
       console.log("Fetched usage stats:", stats);
       res.json(stats);
     } catch (error) {
@@ -207,10 +227,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // USER SETTINGS
-  app.get("/api/settings", async (_req, res) => {
+  app.get("/api/settings", async (req, res) => {
     console.log("GET /api/settings called");
     try {
-      const settings = await storage.getUserSettings();
+      const sessionId = req.query.sessionId as string;
+      const settings = await storage.getUserSettings(sessionId);
       console.log("Fetched user settings:", settings);
       res.json(settings);
     } catch (error) {
@@ -222,7 +243,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/settings", async (req, res) => {
     console.log("PATCH /api/settings body:", req.body);
     try {
-      const settings = await storage.updateUserSettings(req.body);
+      const sessionId = req.body.sessionId as string;
+      const settings = await storage.updateUserSettings(req.body, sessionId);
       console.log("Updated settings:", settings);
       res.json(settings);
     } catch (error) {

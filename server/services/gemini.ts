@@ -1,12 +1,12 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 const DEFAULT_API_KEY = "AIzaSyCFjDmsbbVMA4rQhIiJVuTOYYDajIpIA2w";
 const BACKUP_API_KEY = "AIzaSyCBELEsLuMenKZtj9tMaA1CT1t24zCurRE";
 
-let ai: GoogleGenerativeAI | null = null;
+let ai: GoogleGenAI | null = null;
 
 function initAI(apiKey: string) {
-  ai = new GoogleGenerativeAI(apiKey);
+  ai = new GoogleGenAI({ apiKey });
 }
 
 function fallbackAI() {
@@ -62,10 +62,10 @@ export async function generateChatResponse(
     } catch (retryError) {
       console.error("Gemini API Error (Fallback Failed):", retryError);
       return "AI response failed.";
+    } finally {
+      ai = null;
+      global.gc?.();
     }
-  } finally {
-    ai = null;
-    global.gc?.();
   }
 }
 

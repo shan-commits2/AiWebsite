@@ -1,13 +1,16 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const DEFAULT_API_KEY = "AIzaSyCFjDmsbbVMA4rQhIiJVuTOYYDajIpIA2w";
 const BACKUP_API_KEY = "AIzaSyCBELEsLuMenKZtj9tMaA1CT1t24zCurRE";
 
-// Start with the backup key
-let ai = new GoogleGenAI({ apiKey: BACKUP_API_KEY });
+let ai: GoogleGenerativeAI | null = null;
 
-async function fallbackAI(): Promise<void> {
-  ai = new GoogleGenAI({ apiKey: DEFAULT_API_KEY });
+function initAI(apiKey: string) {
+  ai = new GoogleGenerativeAI(apiKey);
+}
+
+function fallbackAI() {
+  initAI(DEFAULT_API_KEY);
 }
 
 const INSTRUCTION = `
@@ -32,9 +35,7 @@ You can provide language translation and learning assistance.
 You can also engage in educational discussions and tutoring.
 You can provide health and wellness advice, but always recommend consulting a professional for medical issues.
 You can also engage in fitness and nutrition discussions.
-You can also engage in sex topics, but always maintain a respectful and consensual tone.
-Act cool even in sexual topics
-If is safe sex topic explain it very cool like the inside going insane
+You can also engage in sex topics, but always maintain a respectful and consensual tone, and if is too innaportiate dont engage.
 `;
 
 /**
@@ -42,70 +43,71 @@ If is safe sex topic explain it very cool like the inside going insane
  */
 export async function generateChatResponse(
   message: string,
-  model: string = "gemini-1.5-flash"
+  model = "gemini-1.5-flash"
 ): Promise<string> {
-  const fullPrompt = INSTRUCTION + "\nUser: " + message;
+  if (!ai) initAI(BACKUP_API_KEY);
+  const prompt = INSTRUCTION + "\nUser: " + message;
 
   try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: fullPrompt,
-    });
-
-    return response.text?.trim() || "I apologize, but I couldn't generate a response at this time.";
+    const modelInstance = ai.getGenerativeModel({ model });
+    const result = await modelInstance.generateContent(prompt);
+    return result.response.text().trim() || "I couldn't generate a response at this time.";
   } catch (error) {
     console.error("Gemini API Error (Backup Key Failed):", error);
-
+    fallbackAI();
     try {
-      await fallbackAI();
-      const retryResponse = await ai.models.generateContent({
-        model,
-        contents: fullPrompt,
-      });
-
-      return retryResponse.text?.trim() || "I apologize, but I couldn't generate a response at this time.";
+      const modelInstance = ai.getGenerativeModel({ model });
+      const retryResult = await modelInstance.generateContent(prompt);
+      return retryResult.response.text().trim() || "I couldn't generate a response at this time.";
     } catch (retryError) {
       console.error("Gemini API Error (Fallback Failed):", retryError);
-      throw new Error(
-        `Failed to generate AI response: ${retryError instanceof Error ? retryError.message : "Unknown error"}`
-      );
+      return "AI response failed.";
     }
+  } finally {
+    ai = null;
+    global.gc?.();
   }
 }
 
 /**
  * Generate a short conversation title.
  */
-export async function generateConversationTitle(
-  firstMessage: string,
-  model: string = "gemini-1.5-flash"
-): Promise<string> {
+export async function generateConversationTitle(firstMessage: string): Promise<string> {
+  if (!ai) initAI(BACKUP_API_KEY);
   const prompt =
-    `Generate a short, descriptive title (max 6 words) for a conversation that starts with: "${firstMessage}". Only return the title, nothing else.`;
+    `Generate a short, descriptive title (max 6 words) for a conversation that starts with: "${firstMessage}". Only return the title.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-    });
-
-    const title = response.text?.trim() || "New Conversation";
+    const modelInstance = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await modelInstance.generateContent(prompt);
+    let title = result.response.text().trim() || "New Conversation";
     return title.length > 50 ? title.slice(0, 47) + "..." : title;
   } catch (error) {
-    console.error("Gemini Title Error (Backup Key Failed):", error);
+    console.error("Gemini Title Error:", error);
+    fallbackAI();
+    return "New Conversation";
+  } finally {
+    ai = null;
+    global.gc?.();
+  }
+}
 
-    try {
-      await fallbackAI();
-      const retryResponse = await ai.models.generateContent({
-        model,
-        contents: prompt,
-      });
+/**
+ * Generate an image from a prompt.
+ */
+export async function generateImage(prompt: string): Promise<Buffer | null> {
+  if (!ai) initAI(BACKUP_API_KEY);
 
-      const title = retryResponse.text?.trim() || "New Conversation";
-      return title.length > 50 ? title.slice(0, 47) + "..." : title;
-    } catch (retryError) {
-      console.error("Gemini Title Error (Fallback Failed):", retryError);
-      return "New Conversation";
-    }
+  try {
+    const modelInstance = ai.getGenerativeModel({ model: "imagen-3.0" });
+    const result = await modelInstance.generateContent(prompt);
+    const base64Img = result.response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    return base64Img ? Buffer.from(base64Img, "base64") : null;
+  } catch (error) {
+    console.error("Image generation failed:", error);
+    return null;
+  } finally {
+    ai = null;
+    global.gc?.();
   }
 }

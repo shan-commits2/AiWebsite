@@ -141,25 +141,41 @@ export const GEMINI_MODELS = {
     name: "Gemini 1.5 Flash",
     description: "Fast responses, great for general tasks",
     speed: "Fast",
-    capabilities: ["Text", "Code", "Math"],
+    capabilities: ["Text", "Code", "Math", "Multimodal"],
     tokensPerMinute: 15000,
-    maxTokens: 32000
+    maxTokens: 1000000
   },
   "gemini-2.0-flash-exp": {
-    name: "Gemini 2.0 Flash",
-    description: "Latest model with enhanced capabilities",
-    speed: "Fast", 
-    capabilities: ["Text", "Code", "Math", "Reasoning"],
+    name: "Gemini 2.0 Flash (Experimental)",
+    description: "Preview version of the upgraded Flash model",
+    speed: "Slow/Medium",
+    capabilities: ["Text", "Code", "Math", "Reasoning", "Multimodal"],
     tokensPerMinute: 10000,
-    maxTokens: 32000
+    maxTokens: 1000000
+  },
+  "gemini-2.0-flash": {
+    name: "Gemini 2.0 Flash",
+    description: "Fast, multimodal, with enhanced reasoning and tool use",
+    speed: "Fast",
+    capabilities: ["Text", "Code", "Math", "Reasoning", "Multimodal", "Vision", "Tool Use"],
+    tokensPerMinute: 12000,
+    maxTokens: 1000000
+  },
+  "gemini-2.0-flash-lite": {
+    name: "Gemini 2.0 Flash Lite",
+    description: "Cost-optimized version ideal for high-throughput apps",
+    speed: "Faster",
+    capabilities: ["Text", "Multimodal"],
+    tokensPerMinute: 15000,
+    maxTokens: 1000000
   },
   "gemini-2.5-flash": {
     name: "Gemini 2.5 Flash",
-    description: "Advanced model with thinking capabilities",
+    description: "Latest Flash model with enhanced reasoning and audio support",
     speed: "Fast",
-    capabilities: ["Text", "Code", "Math", "Reasoning", "Thinking"],
-    tokensPerMinute: 8000,
-    maxTokens: 32000
+    capabilities: ["Text", "Code", "Math", "Reasoning", "Thinking", "Vision", "Multimodal", "Audio Input"],
+    tokensPerMinute: 14000,
+    maxTokens: 1000000
   }
 } as const;
 

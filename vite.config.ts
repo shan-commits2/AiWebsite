@@ -18,7 +18,7 @@ export default defineConfig(async () => {
   }
 
   return {
-    base: "",
+    base: "./",
 
     plugins,
 

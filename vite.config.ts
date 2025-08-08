@@ -41,6 +41,7 @@ export default defineConfig(async () => {
       fs: {
         strict: true,
         deny: ["**/.*"],
+        '/api': 'http://localhost:5000'
       },
     },
   };

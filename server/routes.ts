@@ -10,8 +10,9 @@ import { z } from "zod";
 // Middleware to attach sessionId from query, body, or headers
 function sessionIdMiddleware(req, res, next) {
   const sessionId =
-    req.query.sessionId ||
+    req.headers["x-session-id"] ||
     req.body.sessionId ||
+    req.query.sessionId ||
     req.headers["sessionid"] ||
     null;
 

@@ -5,9 +5,11 @@ const DEFAULT_API_KEY = "AIzaSyCFjDmsbbVMA4rQhIiJVuTOYYDajIpIA2w";
 const BACKUP_API_KEY = "AIzaSyCBELEsLuMenKZtj9tMaA1CT1t24zCurRE";
 
 let ai = new GoogleGenAI({ apiKey: BACKUP_API_KEY });
+let usingBackup = true;
 
-async function fallbackAI(): Promise<void> {
+async function switchToDefaultAI() {
   ai = new GoogleGenAI({ apiKey: DEFAULT_API_KEY });
+  usingBackup = false;
 }
 
 const INSTRUCTION = `
@@ -137,7 +139,6 @@ export async function generateChatResponse(
     searchResultText = await internetSearch(message);
   }
 
-  // Add user message and optionally search info to memory
   conversationMemory.history.push(`User: ${message}`);
 
   if (searchResultText) {
@@ -175,13 +176,18 @@ export async function generateChatResponse(
 
       return { text, tokensUsed, responseTimeMs };
     } catch (error) {
-      console.error("Gemini API Error (Backup Key Failed):", error);
+      console.error(`Gemini API Error (${usingBackup ? "Backup" : "Default"} Key):`, error);
 
-      try {
-        await fallbackAI();
-        retries++;
-      } catch {
-        throw new Error("Failed to switch API keys.");
+      if (usingBackup) {
+        try {
+          await switchToDefaultAI();
+          retries++;
+          continue;
+        } catch {
+          throw new Error("Failed to switch from backup to default API key.");
+        }
+      } else {
+        throw new Error("Failed to generate a response after fallback.");
       }
     }
   }
@@ -204,19 +210,22 @@ export async function generateConversationTitle(
     const title = response.text?.trim() || "New Conversation";
     return title.length > 50 ? title.slice(0, 47) + "..." : title;
   } catch (error) {
-    console.error("Gemini Title Error (Backup Key Failed):", error);
+    console.error(`Gemini Title Error (${usingBackup ? "Backup" : "Default"} Key):`, error);
 
-    try {
-      await fallbackAI();
-      const retryResponse = await ai.models.generateContent({
-        model,
-        contents: prompt,
-      });
-
-      const title = retryResponse.text?.trim() || "New Conversation";
-      return title.length > 50 ? title.slice(0, 47) + "..." : title;
-    } catch (retryError) {
-      console.error("Gemini Title Error (Fallback Failed):", retryError);
+    if (usingBackup) {
+      try {
+        await switchToDefaultAI();
+        const retryResponse = await ai.models.generateContent({
+          model,
+          contents: prompt,
+        });
+        const title = retryResponse.text?.trim() || "New Conversation";
+        return title.length > 50 ? title.slice(0, 47) + "..." : title;
+      } catch (retryError) {
+        console.error("Gemini Title Error (Fallback Failed):", retryError);
+        return "New Conversation";
+      }
+    } else {
       return "New Conversation";
     }
   }

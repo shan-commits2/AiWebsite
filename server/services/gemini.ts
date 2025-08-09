@@ -1,18 +1,12 @@
 import express from "express";
 import { GoogleGenAI } from "@google/genai";
 
-const app = express();
-app.use(express.json());
-
-const PORT = process.env.PORT || 3000;
-
 const DEFAULT_API_KEY = "AIzaSyCFjDmsbbVMA4rQhIiJVuTOYYDajIpIA2w";
 const BACKUP_API_KEY = "AIzaSyCBELEsLuMenKZtj9tMaA1CT1t24zCurRE";
 
 let ai = new GoogleGenAI({ apiKey: BACKUP_API_KEY });
 
 async function fallbackAI(): Promise<void> {
-  console.log("[fallbackAI] Switching to DEFAULT_API_KEY");
   ai = new GoogleGenAI({ apiKey: DEFAULT_API_KEY });
 }
 
@@ -107,8 +101,7 @@ function getMemorySizeInBytes(): number {
 
 function pruneMemory() {
   while (getMemorySizeInBytes() > MAX_MEMORY_BYTES && conversationMemory.history.length > 2) {
-    const removed = conversationMemory.history.shift();
-    console.log(`[pruneMemory] Removed from memory: ${removed?.slice(0, 50)}...`);
+    conversationMemory.history.shift();
   }
 }
 
@@ -116,7 +109,6 @@ async function generateChatResponse(
   message: string,
   model: string = "gemini-1.5-flash"
 ): Promise<{ text: string; tokensUsed: number; responseTimeMs: number }> {
-  console.log(`[generateChatResponse] User message received: "${message}"`);
   conversationMemory.history.push(`User: ${message}`);
   pruneMemory();
 
@@ -127,7 +119,6 @@ async function generateChatResponse(
   while (retries < MAX_RETRIES) {
     const startTime = Date.now();
     try {
-      console.log(`[generateChatResponse] Sending prompt to API (attempt ${retries + 1})...`);
       const response = await ai.models.generateContent({
         model,
         contents: fullPrompt,
@@ -138,15 +129,7 @@ async function generateChatResponse(
       const tokensUsed = text.split(/\s+/).length;
       const responseTimeMs = endTime - startTime;
 
-      console.log(`[generateChatResponse] Received response in ${responseTimeMs}ms, tokens used: ${tokensUsed}`);
-
-      if (tokensUsed > MAX_TOTAL_TOKENS) {
-        console.warn(`[generateChatResponse] Response tokens (${tokensUsed}) exceed max allowed (${MAX_TOTAL_TOKENS}), retrying...`);
-        retries++;
-        continue;
-      }
-      if (tooManyWordsPerLine(text)) {
-        console.warn(`[generateChatResponse] Response has too many words in one line, retrying...`);
+      if (tokensUsed > MAX_TOTAL_TOKENS || tooManyWordsPerLine(text)) {
         retries++;
         continue;
       }
@@ -156,12 +139,11 @@ async function generateChatResponse(
 
       return { text, tokensUsed, responseTimeMs };
     } catch (error) {
-      console.error("[generateChatResponse] Gemini API Error:", error);
+      console.error("Gemini API Error (Backup Key Failed):", error);
       try {
         await fallbackAI();
         retries++;
-      } catch (fallbackError) {
-        console.error("[generateChatResponse] Failed to switch API keys:", fallbackError);
+      } catch {
         throw new Error("Failed to switch API keys.");
       }
     }
@@ -173,12 +155,10 @@ async function generateConversationTitle(
   firstMessage: string,
   model: string = "gemini-1.5-flash"
 ): Promise<string> {
-  console.log(`[generateConversationTitle] Generating title for: "${firstMessage}"`);
   const prompt =
     `Generate a short, descriptive title (max 6 words) for a conversation starting with: "${firstMessage}". Return ONLY the title, nothing else.`;
 
   try {
-    console.log("[generateConversationTitle] Sending prompt to API (primary key)...");
     const response = await ai.models.generateContent({
       model,
       contents: prompt,
@@ -189,15 +169,13 @@ async function generateConversationTitle(
     }
 
     const title = response.text.trim();
-    console.log(`[generateConversationTitle] Title received: "${title}"`);
     return title.length > 50 ? title.slice(0, 47) + "..." : title;
-
   } catch (error) {
-    console.error("[generateConversationTitle] Error with primary key:", error);
+    console.error("Gemini Title Error (Primary Key):", error);
 
     try {
       await fallbackAI();
-      console.log("[generateConversationTitle] Retrying with fallback key...");
+
       const retryResponse = await ai.models.generateContent({
         model,
         contents: prompt,
@@ -208,45 +186,45 @@ async function generateConversationTitle(
       }
 
       const retryTitle = retryResponse.text.trim();
-      console.log(`[generateConversationTitle] Title received on fallback: "${retryTitle}"`);
       return retryTitle.length > 50 ? retryTitle.slice(0, 47) + "..." : retryTitle;
-
     } catch (retryError) {
-      console.error("[generateConversationTitle] Fallback key failed:", retryError);
+      console.error("Gemini Title Error (Fallback Failed):", retryError);
       return "New Conversation";
     }
   }
 }
 
-// Express routes
+// Express setup
+import bodyParser from "body-parser";
+import cors from "cors";
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(bodyParser.json());
 
 app.post("/chat", async (req, res) => {
-  const { message, model } = req.body;
-  if (!message) {
-    return res.status(400).json({ error: "Missing 'message' in request body" });
-  }
-
+  console.log("Received chat message:", req.body.message);
   try {
-    const result = await generateChatResponse(message, model);
+    const result = await generateChatResponse(req.body.message);
+    console.log("Response generated:", result.text);
     res.json(result);
-  } catch (error) {
-    console.error("[/chat] Error generating chat response:", error);
-    res.status(500).json({ error: error.message || "Internal Server Error" });
+  } catch (err) {
+    console.error("Error in /chat:", err);
+    res.status(500).json({ error: err.message || "Internal server error" });
   }
 });
 
 app.post("/title", async (req, res) => {
-  const { firstMessage, model } = req.body;
-  if (!firstMessage) {
-    return res.status(400).json({ error: "Missing 'firstMessage' in request body" });
-  }
-
+  console.log("Received title request for:", req.body.firstMessage);
   try {
-    const title = await generateConversationTitle(firstMessage, model);
+    const title = await generateConversationTitle(req.body.firstMessage);
+    console.log("Title generated:", title);
     res.json({ title });
-  } catch (error) {
-    console.error("[/title] Error generating conversation title:", error);
-    res.status(500).json({ error: error.message || "Internal Server Error" });
+  } catch (err) {
+    console.error("Error in /title:", err);
+    res.status(500).json({ error: err.message || "Internal server error" });
   }
 });
 

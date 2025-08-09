@@ -8,6 +8,9 @@ import { type Conversation, GEMINI_MODELS, type GeminiModel } from "@shared/sche
 import { ModelSelector } from "@/components/model-selector";
 import { cn } from "@/lib/utils";
 
+// Import Settings modal
+import { Settings as SettingsModal } from "./Settings";
+
 interface ChatSidebarProps {
   selectedConversationId?: string;
   onSelectConversation: (conversationId: string) => void;
@@ -28,6 +31,8 @@ export function ChatSidebar({
   onModelChange
 }: ChatSidebarProps) {
   const queryClient = useQueryClient();
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const { data: conversations = [], isLoading } = useQuery<Conversation[]>({
     queryKey: ["/api/conversations"],
@@ -74,6 +79,9 @@ export function ChatSidebar({
 
   return (
     <>
+      {/* Settings Modal */}
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
       {/* Mobile header */}
       <div className="md:hidden bg-gray-800/95 backdrop-blur-sm border-b border-gray-700/50 p-4 flex items-center justify-between shadow-lg">
         <Button
@@ -124,7 +132,7 @@ export function ChatSidebar({
           <Button 
             onClick={handleNewChat}
             disabled={createConversationMutation.isPending}
-            className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white border-none justify-start shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
+            className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white border-none justify-start shadow-lg hover:shadow-xl transition-all duration-[...]
             variant="outline"
           >
             <Plus className="h-4 w-4 mr-3" />
@@ -207,7 +215,12 @@ export function ChatSidebar({
                 <span>Online</span>
               </p>
             </div>
-            <Button variant="ghost" size="sm" className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
+              onClick={() => setSettingsOpen(true)}
+            >
               <Settings className="h-4 w-4 text-gray-400" />
             </Button>
           </div>

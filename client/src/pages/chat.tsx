@@ -3,13 +3,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChatSidebar } from "@/components/chat-sidebar";
 import { ChatMessage } from "@/components/chat-message";
 import { ChatInput } from "@/components/chat-input";
+import { ThemeSelector } from "@/components/theme-selector";
+import { ExportDialog } from "@/components/export-dialog";
+import { AnalyticsDashboard } from "@/components/analytics-dashboard";
+import { FileUpload } from "@/components/file-upload";
+import { VoiceInput } from "@/components/voice-input";
+import { ModelComparison } from "@/components/model-comparison";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Settings as SettingsIcon } from "lucide-react";
+import { MessageSquare, Settings, Sparkles, BarChart2, UploadCloud, Mic, Layers } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { type Message, type GeminiModel, type Theme, type Conversation } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { Settings } from "@/components/Settings";
+import { Settings as SettingsPanel } from "@/components/Settings";
 
 export default function Chat() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
@@ -17,6 +23,14 @@ export default function Chat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<GeminiModel>("gemini-1.5-flash");
   const [selectedTheme, setSelectedTheme] = useState<Theme>("dark-gray");
+  const [showAdvancedPanel, setShowAdvancedPanel] = useState(false);
+  const [currentMessage, setCurrentMessage] = useState("");
+
+  // Panels visibility states
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showFileUpload, setShowFileUpload] = useState(false);
+  const [showVoiceInput, setShowVoiceInput] = useState(false);
+  const [showModelComparison, setShowModelComparison] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -140,10 +154,14 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  // Apply theme globally via attribute or class
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", selectedTheme);
-  }, [selectedTheme]);
+  // Panel toggle handler to close others when one opens (optional)
+  const togglePanel = (panel: string) => {
+    setShowAnalytics(panel === "analytics" ? !showAnalytics : false);
+    setShowFileUpload(panel === "fileupload" ? !showFileUpload : false);
+    setShowVoiceInput(panel === "voiceinput" ? !showVoiceInput : false);
+    setShowModelComparison(panel === "modelcomparison" ? !showModelComparison : false);
+    setShowSettings(panel === "settings" ? !showSettings : false);
+  };
 
   return (
     <div className="flex h-screen bg-gray-900 text-white">
@@ -157,80 +175,104 @@ export default function Chat() {
         onModelChange={setSelectedModel}
       />
 
+      {/* Main Chat + Panels container */}
       <div className="flex-1 flex flex-col relative">
-        {/* Top bar */}
+
+        {/* Top bar with toggles for extra features */}
         <div className="flex items-center justify-end gap-3 p-2 border-b border-gray-700 bg-gray-800">
-          <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)} title="Settings">
-            <SettingsIcon className="w-5 h-5" />
+          <Button variant="ghost" size="sm" onClick={() => togglePanel("analytics")} title="Analytics Dashboard">
+            <BarChart2 className="w-5 h-5" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => togglePanel("fileupload")} title="File Upload">
+            <UploadCloud className="w-5 h-5" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => togglePanel("voiceinput")} title="Voice Input">
+            <Mic className="w-5 h-5" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => togglePanel("modelcomparison")} title="Model Comparison">
+            <Layers className="w-5 h-5" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => togglePanel("settings")} title="Settings">
+            <Settings className="w-5 h-5" />
           </Button>
         </div>
 
-        {/* Chat + messages */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <ScrollArea className="h-full">
-            <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-              {!selectedConversationId ? (
-                <div className="text-center py-16">
-                  <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-green-500 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-2xl animate-pulse">
-                    <MessageSquare className="h-10 w-10 text-white" />
+        <div className="flex flex-1 overflow-hidden">
+          {/* Chat Messages Area */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <ScrollArea className="h-full">
+              <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+                {!selectedConversationId ? (
+                  // Welcome message
+                  <div className="text-center py-16">
+                    <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-green-500 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-2xl animate-pulse">
+                      <MessageSquare className="h-10 w-10 text-white" />
+                    </div>
+                    <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-green-400 bg-clip-text text-transparent">
+                      Welcome to GemiFlow
+                    </h2>
+                    <p className="text-gray-400 text-lg mb-8">Start a conversation and experience the power of Google AI</p>
+                    <div className="flex flex-wrap justify-center gap-3 text-sm text-gray-500">
+                      <div className="flex items-center space-x-2 bg-gray-800/50 px-3 py-2 rounded-lg">
+                        <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                        <span>Code assistance</span>
+                      </div>
+                      <div className="flex items-center space-x-2 bg-gray-800/50 px-3 py-2 rounded-lg">
+                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <span>Creative writing</span>
+                      </div>
+                      <div className="flex items-center space-x-2 bg-gray-800/50 px-3 py-2 rounded-lg">
+                        <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                        <span>Problem solving</span>
+                      </div>
+                    </div>
                   </div>
-                  <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-green-400 bg-clip-text text-transparent">
-                    Welcome to GemiFlow
-                  </h2>
-                  <p className="text-gray-400 text-lg mb-8">Start a conversation and experience the power of Google AI</p>
-                  <div className="flex flex-wrap justify-center gap-3 text-sm text-gray-500">
-                    <div className="flex items-center space-x-2 bg-gray-800/50 px-3 py-2 rounded-lg">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                      <span>Code assistance</span>
-                    </div>
-                    <div className="flex items-center space-x-2 bg-gray-800/50 px-3 py-2 rounded-lg">
-                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                      <span>Creative writing</span>
-                    </div>
-                    <div className="flex items-center space-x-2 bg-gray-800/50 px-3 py-2 rounded-lg">
-                      <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                      <span>Problem solving</span>
-                    </div>
+                ) : (
+                  // Messages
+                  <div className="space-y-6">
+                    {isLoading ? (
+                      <div className="text-center py-8 text-gray-400">
+                        Loading conversation...
+                      </div>
+                    ) : messages.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400">
+                        Start the conversation by sending a message
+                      </div>
+                    ) : (
+                      messages.map((message) => (
+                        <ChatMessage key={message.id} message={message} />
+                      ))
+                    )}
+                    {isTyping && <ChatMessage isTyping />}
+                    <div ref={messagesEndRef} />
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {isLoading ? (
-                    <div className="text-center py-8 text-gray-400">
-                      Loading conversation...
-                    </div>
-                  ) : messages.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400">
-                      Start the conversation by sending a message
-                    </div>
-                  ) : (
-                    messages.map((message) => (
-                      <ChatMessage key={message.id} message={message} />
-                    ))
-                  )}
-                  {isTyping && <ChatMessage isTyping />}
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-          <ChatInput
-            onSendMessage={handleSendMessage}
-            disabled={sendMessageMutation.isPending}
-            placeholder={selectedConversationId ? "Type your message..." : "Start a new conversation to begin chatting..."}
-          />
-        </div>
+                )}
+              </div>
+            </ScrollArea>
+            <ChatInput
+              onSendMessage={handleSendMessage}
+              disabled={sendMessageMutation.isPending}
+              placeholder={selectedConversationId ? "Type your message..." : "Start a new conversation to begin chatting..."}
+            />
+          </div>
 
-        {/* Settings Modal */}
-        {showSettings && (
-          <Settings
-            selectedTheme={selectedTheme}
-            onThemeChange={setSelectedTheme}
-            selectedModel={selectedModel}
-            onModelChange={setSelectedModel}
-            onClose={() => setShowSettings(false)}
-          />
-        )}
+          {/* Panels Area (side drawer / overlay) */}
+          <div className="w-96 bg-gray-800 border-l border-gray-700 overflow-auto">
+            {showAnalytics && <AnalyticsDashboard />}
+            {showFileUpload && <FileUpload />}
+            {showVoiceInput && <VoiceInput />}
+            {showModelComparison && <ModelComparison selectedModel={selectedModel} onModelChange={setSelectedModel} />}
+            {showSettings && (
+              <SettingsPanel
+                selectedTheme={selectedTheme}
+                onThemeChange={setSelectedTheme}
+                selectedModel={selectedModel}
+                onModelChange={setSelectedModel}
+                onClose={() => setShowSettings(false)}
+              />
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

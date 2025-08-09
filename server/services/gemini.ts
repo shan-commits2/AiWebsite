@@ -1,4 +1,3 @@
-import express from "express";
 import { GoogleGenAI } from "@google/genai";
 
 const DEFAULT_API_KEY = "AIzaSyCFjDmsbbVMA4rQhIiJVuTOYYDajIpIA2w";
@@ -194,40 +193,4 @@ async function generateConversationTitle(
   }
 }
 
-// Express setup
-import bodyParser from "body-parser";
-import cors from "cors";
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.use(cors());
-app.use(bodyParser.json());
-
-app.post("/chat", async (req, res) => {
-  console.log("Received chat message:", req.body.message);
-  try {
-    const result = await generateChatResponse(req.body.message);
-    console.log("Response generated:", result.text);
-    res.json(result);
-  } catch (err) {
-    console.error("Error in /chat:", err);
-    res.status(500).json({ error: err.message || "Internal server error" });
-  }
-});
-
-app.post("/title", async (req, res) => {
-  console.log("Received title request for:", req.body.firstMessage);
-  try {
-    const title = await generateConversationTitle(req.body.firstMessage);
-    console.log("Title generated:", title);
-    res.json({ title });
-  } catch (err) {
-    console.error("Error in /title:", err);
-    res.status(500).json({ error: err.message || "Internal server error" });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});

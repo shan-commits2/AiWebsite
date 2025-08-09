@@ -11,7 +11,7 @@ import { VoiceInput } from "@/components/voice-input";
 import { ModelComparison } from "@/components/model-comparison";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Settings, Sparkles, BarChart2, UploadCloud, Mic, Layers } from "lucide-react";
+import { MessageSquare, Settings as SettingsIcon, Sparkles, BarChart2, UploadCloud, Mic, Layers } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { type Message, type GeminiModel, type Theme, type Conversation } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
@@ -193,7 +193,7 @@ export default function Chat() {
             <Layers className="w-5 h-5" />
           </Button>
           <Button variant="ghost" size="sm" onClick={() => togglePanel("settings")} title="Settings">
-            <Settings className="w-5 h-5" />
+            <SettingsIcon className="w-5 h-5" />
           </Button>
         </div>
 
@@ -267,3 +267,5 @@ export default function Chat() {
         </div>
       </div>
     </div>
+  );
+}

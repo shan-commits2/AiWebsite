@@ -11,7 +11,7 @@ import { VoiceInput } from "@/components/voice-input";
 import { ModelComparison } from "@/components/model-comparison";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Settings, Sparkles } from "lucide-react";
+import { MessageSquare, Settings, Sparkles, BarChart2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { type Message, type GeminiModel, type Theme, type Conversation } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +23,7 @@ export default function Chat() {
   const [selectedModel, setSelectedModel] = useState<GeminiModel>("gemini-1.5-flash");
   const [selectedTheme, setSelectedTheme] = useState<Theme>("dark-gray");
   const [showAdvancedPanel, setShowAdvancedPanel] = useState(false);
+  const [showAnalyticsDashboard, setShowAnalyticsDashboard] = useState(false); // NEW STATE
   const [currentMessage, setCurrentMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
@@ -164,6 +165,35 @@ export default function Chat() {
       />
       
       <div className="flex-1 flex flex-col">
+        {/* Analytic Button at top right */}
+        <div className="flex justify-end items-center p-4 space-x-2">
+          <Button
+            variant="outline"
+            className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-100 border-none shadow"
+            onClick={() => setShowAnalyticsDashboard(true)}
+            aria-label="Open Analytics Dashboard"
+          >
+            <BarChart2 className="w-5 h-5" />
+            Analytics
+          </Button>
+        </div>
+
+        {/* Analytics Dashboard Modal/Panel */}
+        {showAnalyticsDashboard && (
+          <div className="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-center justify-center">
+            <div className="relative bg-gray-900 rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+              <button
+                className="absolute top-3 right-3 text-gray-400 hover:text-white text-xl"
+                onClick={() => setShowAnalyticsDashboard(false)}
+                aria-label="Close Analytics Dashboard"
+              >
+                ×
+              </button>
+              <AnalyticsDashboard />
+            </div>
+          </div>
+        )}
+
         <div className="flex-1 overflow-hidden">
           <ScrollArea className="h-full">
             <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">

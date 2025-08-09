@@ -26,7 +26,6 @@ function sessionIdMiddleware(req, res, next) {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Apply sessionIdMiddleware to all /api routes except file uploads
   app.use("/api", express.json(), (req, res, next) => {
-    // Skip for uploads since multer handles its own body parsing
     if (req.path.startsWith("/upload")) return next();
     sessionIdMiddleware(req, res, next);
   });
@@ -60,68 +59,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   });
+
+  // GET analytics totals
   app.get("/api/analytics/totals", async (req, res) => {
-  try {
-    const usageStats = await storage.getUsageStats();
-    const conversations = await storage.getConversations();
+    try {
+      const usageStats = await storage.getUsageStats();
+      const conversations = await storage.getConversations();
 
-    const totalTokens = usageStats.reduce((sum, stat) => sum + (stat.tokensUsed || 0), 0);
-    const totalMessages = usageStats.reduce((sum, stat) => sum + (stat.messagesExchanged || 0), 0);
-    const totalConversations = conversations.length;
+      const totalTokens = usageStats.reduce((sum, stat) => sum + (stat.tokensUsed || 0), 0);
+      const totalMessages = usageStats.reduce((sum, stat) => sum + (stat.messagesExchanged || 0), 0);
+      const totalConversations = conversations.length;
 
-    res.json({ totalTokens, totalMessages, totalConversations });
-  } catch (error) {
-    console.error("Error fetching totals:", error);
-    res.status(500).json({ message: "Failed to fetch totals" });
-  }
-});
-
-app.post("/api/conversations/:id/messages", async (req, res) => {
-  try {
-    const conversationId = req.params.id;
-    const messageData = { ...req.body, conversationId, sessionId: req.sessionId };
-    const validatedData = insertMessageSchema.parse(messageData);
-
-    const conversation = await storage.getConversation(conversationId);
-    if (!conversation) return res.status(404).json({ message: "Conversation not found" });
-
-    // Create user message
-    const userMessage = await storage.createMessage(validatedData);
-    await storage.updateConversation(conversationId, { updatedAt: new Date() });
-
-    // Generate AI response (text + tokens + response time)
-    const { text: aiText, tokensUsed, responseTimeMs } = await generateChatResponse(validatedData.content, conversation.model);
-
-    // Create AI message with tokens and response time
-    const aiMessage = await storage.createMessage({
-      conversationId,
-      sessionId: req.sessionId,
-      role: "assistant",
-      content: aiText,
-      tokens: tokensUsed,
-      responseTime: responseTimeMs,
-    });
-
-    // Update usage analytics
-    await storage.recordUsage({
-      conversationsCreated: 0,
-      messagesExchanged: 1,
-      tokensUsed,
-      averageResponseTime: responseTimeMs,
-      modelsUsed: { [conversation.model]: 1 },
-    });
-
-    res.status(201).json({ userMessage, aiMessage });
-  } catch (error) {
-    console.error("Message creation error:", error);
-    if (error instanceof z.ZodError) {
-      res.status(400).json({ message: "Invalid message data", errors: error.errors });
-    } else {
-      res.status(500).json({ message: "Failed to create message" });
+      res.json({ totalTokens, totalMessages, totalConversations });
+    } catch (error) {
+      console.error("Error fetching totals:", error);
+      res.status(500).json({ message: "Failed to fetch totals" });
     }
-  }
-});
+  });
 
+  // POST new message & generate AI response + update conversation title on first user message
+  app.post("/api/conversations/:id/messages", async (req, res) => {
+    try {
+      const conversationId = req.params.id;
+      const messageData = { ...req.body, conversationId, sessionId: req.sessionId };
+      const validatedData = insertMessageSchema.parse(messageData);
+
+      const conversation = await storage.getConversation(conversationId, req.sessionId);
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      const userMessage = await storage.createMessage(validatedData);
+      await storage.updateConversation(conversationId, { updatedAt: new Date() }, req.sessionId);
+
+      // Check if this is the first user message, then generate & update title
+      const messages = await storage.getMessages(conversationId, req.sessionId);
+      const userMessagesCount = messages.filter(m => m.role === "user").length;
+
+      if (userMessagesCount === 1) {
+        try {
+          const title = await generateConversationTitle(validatedData.content, conversation.model);
+          console.log("Generated conversation title:", title);
+          await storage.updateConversation(conversationId, { title }, req.sessionId);
+        } catch (titleError) {
+          console.error("Error generating/updating conversation title:", titleError);
+        }
+      }
+
+      // Generate AI response
+      try {
+        const { text: aiText, tokensUsed, responseTimeMs } = await generateChatResponse(validatedData.content, conversation.model);
+
+        const aiMessage = await storage.createMessage({
+          conversationId,
+          sessionId: req.sessionId,
+          role: "assistant",
+          content: aiText,
+          tokens: tokensUsed,
+          responseTime: responseTimeMs,
+        });
+
+        await storage.updateConversation(conversationId, { updatedAt: new Date() }, req.sessionId);
+
+        // Update usage analytics
+        await storage.recordUsage({
+          conversationsCreated: 0,
+          messagesExchanged: 1,
+          tokensUsed,
+          averageResponseTime: responseTimeMs,
+          modelsUsed: { [conversation.model]: 1 },
+        });
+
+        res.status(201).json({ userMessage, aiMessage });
+      } catch (aiError) {
+        console.error("AI response generation error:", aiError);
+        res.status(201).json({ userMessage, error: "Failed to generate AI response. Please try again." });
+      }
+    } catch (error) {
+      console.error("Message creation error:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid message data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create message" });
+      }
+    }
+  });
 
   // DELETE conversation
   app.delete("/api/conversations/:id", async (req, res) => {
@@ -146,51 +168,6 @@ app.post("/api/conversations/:id/messages", async (req, res) => {
     } catch (error) {
       console.error("Error fetching messages:", error);
       res.status(500).json({ message: "Failed to fetch messages" });
-    }
-  });
-
-  // SEND message
-  app.post("/api/conversations/:id/messages", async (req, res) => {
-    try {
-      const conversationId = req.params.id;
-      const messageData = { ...req.body, conversationId, sessionId: req.sessionId };
-      const validatedData = insertMessageSchema.parse(messageData);
-
-      const conversation = await storage.getConversation(conversationId, req.sessionId);
-      if (!conversation) {
-        return res.status(404).json({ message: "Conversation not found" });
-      }
-
-      const userMessage = await storage.createMessage(validatedData);
-      await storage.updateConversation(conversationId, { updatedAt: new Date() }, req.sessionId);
-
-      const messages = await storage.getMessages(conversationId, req.sessionId);
-      if (messages.filter(m => m.role === "user").length === 1) {
-        const title = await generateConversationTitle(validatedData.content, conversation.model);
-        await storage.updateConversation(conversationId, { title }, req.sessionId);
-      }
-
-      try {
-        const aiResponse = await generateChatResponse(validatedData.content, conversation.model);
-        const aiMessage = await storage.createMessage({
-          conversationId,
-          sessionId: req.sessionId,
-          role: "assistant",
-          content: aiResponse,
-        });
-        await storage.updateConversation(conversationId, { updatedAt: new Date() }, req.sessionId);
-
-        res.status(201).json({ userMessage, aiMessage });
-      } catch (aiError) {
-        res.status(201).json({ userMessage, error: "Failed to generate AI response. Please try again." });
-      }
-    } catch (error) {
-      console.error("Message creation error:", error);
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ message: "Invalid message data", errors: error.errors });
-      } else {
-        res.status(500).json({ message: "Failed to create message" });
-      }
     }
   });
 

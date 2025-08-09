@@ -1,3 +1,4 @@
+import fetch from "node-fetch";
 import { GoogleGenAI } from "@google/genai";
 
 const DEFAULT_API_KEY = "AIzaSyCFjDmsbbVMA4rQhIiJVuTOYYDajIpIA2w";
@@ -79,39 +80,74 @@ You adapt your coding style to the user's preferences (e.g., no comments).
 const FINAL_INSTRUCTION = INSTRUCTION + CODING_FOCUS + ADVANCED_CODING_INSTRUCTIONS + NO_COMMENTS_RULE;
 
 const MAX_TOTAL_TOKENS = 2000;
-const MAX_WORDS_PER_LINE = 50;
+const MAX_WORDS_PER_LINE = 100;
 const MAX_RETRIES = 3;
+const MAX_MEMORY_TOKENS = 5000; // max tokens to keep in memory context (adjust as needed)
 
 function tooManyWordsPerLine(text: string) {
   const lines = text.split(/\r?\n/);
   return lines.some(line => line.trim().split(/\s+/).length > MAX_WORDS_PER_LINE);
 }
 
-interface Memory {
-  history: string[];
-}
-const MAX_MEMORY_BYTES = 200 * 1024 * 1024;
-
-const conversationMemory: Memory = { history: [] };
-
-function getMemorySizeInBytes(): number {
-  return conversationMemory.history.reduce((acc, msg) => acc + msg.length * 2, 0);
+// Simple token count estimation by word count
+function countTokens(text: string) {
+  return text.trim().split(/\s+/).length;
 }
 
-function pruneMemory() {
-  while (getMemorySizeInBytes() > MAX_MEMORY_BYTES && conversationMemory.history.length > 2) {
-    conversationMemory.history.shift();
+// Prune oldest messages until memory is under max tokens
+function pruneMemory(history: string[]) {
+  while (history.length > 2 && countTokens(history.join("\n")) > MAX_MEMORY_TOKENS) {
+    history.shift();
+  }
+  return history;
+}
+
+const conversationMemory: { history: string[] } = { history: [] };
+
+async function internetSearch(query: string): Promise<string> {
+  const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1&skip_disambig=1`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.AbstractText && data.AbstractText.length > 0) {
+      return data.AbstractText;
+    }
+    if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+      return data.RelatedTopics[0].Text || "No useful info found.";
+    }
+    return "No relevant information found from search.";
+  } catch {
+    return "Failed to fetch information from the internet.";
   }
 }
 
-async function generateChatResponse(
+function shouldSearch(message: string): boolean {
+  const triggers = ["search", "look up", "find", "google", "internet", "web", "lookup"];
+  const lower = message.toLowerCase();
+  return triggers.some(trigger => lower.includes(trigger));
+}
+
+export async function generateChatResponse(
   message: string,
   model: string = "gemini-1.5-flash"
 ): Promise<{ text: string; tokensUsed: number; responseTimeMs: number }> {
+
+  let searchResultText = "";
+  if (shouldSearch(message)) {
+    searchResultText = await internetSearch(message);
+  }
+
+  // Add user message and optionally search info to memory
   conversationMemory.history.push(`User: ${message}`);
-  pruneMemory();
+
+  if (searchResultText) {
+    conversationMemory.history.push(`Internet info: ${searchResultText}`);
+  }
+
+  pruneMemory(conversationMemory.history);
 
   const memoryContext = conversationMemory.history.join("\n") + "\n";
+
   const fullPrompt = FINAL_INSTRUCTION + "\n" + memoryContext + "Assistant:";
 
   let retries = 0;
@@ -125,7 +161,7 @@ async function generateChatResponse(
       const endTime = Date.now();
 
       const text = response.text?.trim() || "I couldn't generate a response.";
-      const tokensUsed = text.split(/\s+/).length;
+      const tokensUsed = countTokens(text);
       const responseTimeMs = endTime - startTime;
 
       if (tokensUsed > MAX_TOTAL_TOKENS || tooManyWordsPerLine(text)) {
@@ -134,11 +170,13 @@ async function generateChatResponse(
       }
 
       conversationMemory.history.push(`Assistant: ${text}`);
-      pruneMemory();
+
+      pruneMemory(conversationMemory.history);
 
       return { text, tokensUsed, responseTimeMs };
     } catch (error) {
       console.error("Gemini API Error (Backup Key Failed):", error);
+
       try {
         await fallbackAI();
         retries++;
@@ -150,12 +188,12 @@ async function generateChatResponse(
   throw new Error("Failed to generate a response meeting length constraints after retries.");
 }
 
-async function generateConversationTitle(
+export async function generateConversationTitle(
   firstMessage: string,
   model: string = "gemini-1.5-flash"
 ): Promise<string> {
   const prompt =
-    `Generate a short, descriptive title (max 6 words) for a conversation starting with: "${firstMessage}". Return ONLY the title, nothing else.`;
+    `Generate a short, descriptive title (max 6 words) for a conversation that starts with: "${firstMessage}". Only return the title, nothing else.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -163,34 +201,23 @@ async function generateConversationTitle(
       contents: prompt,
     });
 
-    if (!response || typeof response.text !== "string" || response.text.trim() === "") {
-      throw new Error("Empty or invalid text in response");
-    }
-
-    const title = response.text.trim();
+    const title = response.text?.trim() || "New Conversation";
     return title.length > 50 ? title.slice(0, 47) + "..." : title;
   } catch (error) {
-    console.error("Gemini Title Error (Primary Key):", error);
+    console.error("Gemini Title Error (Backup Key Failed):", error);
 
     try {
       await fallbackAI();
-
       const retryResponse = await ai.models.generateContent({
         model,
         contents: prompt,
       });
 
-      if (!retryResponse || typeof retryResponse.text !== "string" || retryResponse.text.trim() === "") {
-        throw new Error("Empty or invalid text in fallback response");
-      }
-
-      const retryTitle = retryResponse.text.trim();
-      return retryTitle.length > 50 ? retryTitle.slice(0, 47) + "..." : retryTitle;
+      const title = retryResponse.text?.trim() || "New Conversation";
+      return title.length > 50 ? title.slice(0, 47) + "..." : title;
     } catch (retryError) {
       console.error("Gemini Title Error (Fallback Failed):", retryError);
       return "New Conversation";
     }
   }
 }
-
-

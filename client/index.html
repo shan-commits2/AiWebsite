@@ -10,26 +10,36 @@
 
     <!-- Session ID Setup -->
     <script>
+      // Create a sessionId if one doesn't exist
       if (!localStorage.getItem('sessionId')) {
         localStorage.setItem('sessionId', crypto.randomUUID());
       }
       const sessionId = localStorage.getItem('sessionId');
       window.sessionId = sessionId;
 
+      // Wrap fetch to inject sessionId into all requests
       const originalFetch = window.fetch;
       window.fetch = async (input, init = {}) => {
         let url = typeof input === "string" ? input : input.url;
+        const method = (init.method || "GET").toUpperCase();
 
-        if (!init.method || init.method.toUpperCase() === "GET") {
+        // Always include sessionId — body for JSON, query param otherwise
+        if (["GET"].includes(method)) {
           const urlObj = new URL(url, window.location.origin);
           urlObj.searchParams.set("sessionId", sessionId);
           url = urlObj.toString();
         } 
-        else if (init.method && ["POST", "PATCH", "DELETE"].includes(init.method.toUpperCase())) {
+        else if (["POST", "PATCH", "DELETE"].includes(method)) {
+          // If sending JSON body
           if (init.headers && init.headers["Content-Type"] === "application/json") {
             const body = init.body ? JSON.parse(init.body) : {};
             body.sessionId = sessionId;
             init.body = JSON.stringify(body);
+          } else {
+            // If no JSON body, attach sessionId as query param
+            const urlObj = new URL(url, window.location.origin);
+            urlObj.searchParams.set("sessionId", sessionId);
+            url = urlObj.toString();
           }
         }
 

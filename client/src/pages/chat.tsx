@@ -23,18 +23,15 @@ export default function Chat() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Load user settings
   const { data: userSettings } = useQuery({
     queryKey: ["/api/settings"],
   });
 
-  // Load current conversation
   const { data: conversation } = useQuery<Conversation>({
     queryKey: ["/api/conversations", selectedConversationId],
     enabled: !!selectedConversationId,
   });
 
-  // Update theme when user settings change
   useEffect(() => {
     if (userSettings?.theme) {
       setSelectedTheme(userSettings.theme as Theme);
@@ -55,9 +52,7 @@ export default function Chat() {
       return response.json();
     },
     onMutate: async ({ conversationId, content }) => {
-      await queryClient.cancelQueries({ 
-        queryKey: ["/api/conversations", conversationId, "messages"] 
-      });
+      await queryClient.cancelQueries({ queryKey: ["/api/conversations", conversationId, "messages"] });
 
       const previousMessages = queryClient.getQueryData(["/api/conversations", conversationId, "messages"]);
 
@@ -69,7 +64,7 @@ export default function Chat() {
         timestamp: new Date(),
       };
 
-      queryClient.setQueryData(["/api/conversations", conversationId, "messages"], (old: any[]) => 
+      queryClient.setQueryData(["/api/conversations", conversationId, "messages"], (old: any[]) =>
         old ? [...old, tempUserMessage] : [tempUserMessage]
       );
 
@@ -80,11 +75,11 @@ export default function Chat() {
     onError: (err, variables, context) => {
       if (context?.previousMessages) {
         queryClient.setQueryData(
-          ["/api/conversations", variables.conversationId, "messages"], 
+          ["/api/conversations", variables.conversationId, "messages"],
           context.previousMessages
         );
       }
-      
+
       toast({
         title: "Error",
         description: "Failed to send message. Please try again.",
@@ -93,13 +88,9 @@ export default function Chat() {
       console.error("Send message error:", err);
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/conversations", selectedConversationId, "messages"] 
-      });
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/conversations"] 
-      });
-      
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations", selectedConversationId, "messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+
       if (data.error) {
         toast({
           title: "AI Response Error",
@@ -135,7 +126,6 @@ export default function Chat() {
     setSidebarOpen(false);
   };
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
@@ -232,16 +222,13 @@ export default function Chat() {
                 ✕
               </Button>
 
-              {/* Your Settings component controls Analytics, ModelComparison, ThemeSelector, etc */}
               <Settings
                 selectedTheme={selectedTheme}
                 onThemeChange={setSelectedTheme}
                 selectedModel={selectedModel}
                 onModelChange={setSelectedModel}
                 userSettings={userSettings}
-                setUserSettings={(newSettings) => {
-                  // implement saving settings if needed
-                }}
+                setUserSettings={() => {}}
               />
             </div>
           </div>

@@ -60,6 +60,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   });
+  app.get("/api/analytics/totals", async (req, res) => {
+  try {
+    const usageStats = await storage.getUsageStats();
+    const conversations = await storage.getConversations();
+
+    const totalTokens = usageStats.reduce((sum, stat) => sum + (stat.tokensUsed || 0), 0);
+    const totalMessages = usageStats.reduce((sum, stat) => sum + (stat.messagesExchanged || 0), 0);
+    const totalConversations = conversations.length;
+
+    res.json({ totalTokens, totalMessages, totalConversations });
+  } catch (error) {
+    console.error("Error fetching totals:", error);
+    res.status(500).json({ message: "Failed to fetch totals" });
+  }
+});
+
 app.post("/api/conversations/:id/messages", async (req, res) => {
   try {
     const conversationId = req.params.id;

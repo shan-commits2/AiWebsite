@@ -109,7 +109,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate AI response
       try {
-        const { text: aiText, tokensUsed, responseTimeMs } = await generateChatResponse(validatedData.content, conversation.model);
+        // Updated here to capture memoryTokens from generateChatResponse
+        const { text: aiText, tokensUsed, memoryTokens, responseTimeMs } = await generateChatResponse(validatedData.content, conversation.model);
 
         const aiMessage = await storage.createMessage({
           conversationId,
@@ -117,6 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: "assistant",
           content: aiText,
           tokens: tokensUsed,
+          memoryTokens,  // <-- store memoryTokens here
           responseTime: responseTimeMs,
         });
 

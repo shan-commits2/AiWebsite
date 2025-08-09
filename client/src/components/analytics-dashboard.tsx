@@ -1,16 +1,30 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BarChart3, MessageSquare, Clock, Zap, TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { type UsageStats } from "@shared/schema";
 
 export function AnalyticsDashboard() {
-  const { data: usageStats = [], isLoading } = useQuery<UsageStats[]>({
+  const [countdown, setCountdown] = useState(5);
+
+  // useQuery with 5s refetch interval
+  const { data: usageStats = [], isLoading, refetch } = useQuery<UsageStats[]>({
     queryKey: ["/api/analytics/usage"],
+    refetchInterval: 5000,
   });
 
   const { data: conversations = [] } = useQuery({
     queryKey: ["/api/conversations"],
+    refetchInterval: 5000,
   });
+
+  // Countdown timer synced with refetchInterval
+  useEffect(() => {
+    setCountdown(5);
+    const interval = setInterval(() => {
+      setCountdown((prev) => (prev === 1 ? 5 : prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const totalConversations = conversations.length;
   const totalMessages = usageStats.reduce((sum, stat) => sum + stat.messagesExchanged, 0);
@@ -56,21 +70,21 @@ export function AnalyticsDashboard() {
 
   if (isLoading)
     return (
-      <div className="flex items-center justify-center h-48 text-gray-400">
-        Loading analytics...
+      <div className="flex flex-col items-center justify-center h-48 text-gray-400">
+        <div>Loading analytics...</div>
+        <div className="text-xs mt-2">update in {countdown}s</div>
       </div>
     );
 
   return (
     <div className="max-w-6xl mx-auto p-6 bg-gray-800 rounded-lg border border-gray-700 max-h-[90vh] overflow-y-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center space-x-3 mb-4">
+      <div className="flex items-center space-x-3 mb-1">
         <BarChart3 className="h-6 w-6 text-blue-400" />
         <h2 className="text-white text-xl font-semibold">Usage Analytics</h2>
+        <span className="text-xs text-gray-400 ml-auto">update in {countdown}s</span>
       </div>
       <p className="text-gray-400 mb-6">Track your AI chat usage and performance metrics</p>
 
-      {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Conversations"
@@ -102,7 +116,6 @@ export function AnalyticsDashboard() {
         />
       </div>
 
-      {/* Recent Activity Chart */}
       <section className="bg-gray-700/50 rounded-lg p-6 border border-gray-600/50">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
           <TrendingUp className="h-5 w-5 mr-2 text-blue-400" />
@@ -143,7 +156,6 @@ export function AnalyticsDashboard() {
         )}
       </section>
 
-      {/* Model Usage Breakdown */}
       <section className="bg-gray-700/50 rounded-lg p-6 border border-gray-600/50">
         <h3 className="text-lg font-semibold text-white mb-4">Model Usage</h3>
 
@@ -194,7 +206,6 @@ export function AnalyticsDashboard() {
         )}
       </section>
 
-      {/* Performance Insights */}
       <section className="bg-gray-700/50 rounded-lg p-6 border border-gray-600/50">
         <h3 className="text-lg font-semibold text-white mb-4">Performance Insights</h3>
 

@@ -86,27 +86,39 @@ const FINAL_INSTRUCTION = INSTRUCTION + CODING_FOCUS + ADVANCED_CODING_INSTRUCTI
 export async function generateChatResponse(
   message: string,
   model: string = "gemini-1.5-flash"
-): Promise<string> {
+): Promise<{ text: string; tokensUsed: number; responseTimeMs: number }> {
   const fullPrompt = FINAL_INSTRUCTION + "\nUser: " + message;
 
+  const startTime = Date.now();
   try {
     const response = await ai.models.generateContent({
       model,
       contents: fullPrompt,
     });
+    const endTime = Date.now();
 
-    return response.text?.trim() || "I apologize, but I couldn't generate a response at this time.";
+    const text = response.text?.trim() || "I couldn't generate a response.";
+    const tokensUsed = text.split(/\s+/).length;
+    const responseTimeMs = endTime - startTime;
+
+    return { text, tokensUsed, responseTimeMs };
   } catch (error) {
     console.error("Gemini API Error (Backup Key Failed):", error);
 
     try {
       await fallbackAI();
+      const retryStart = Date.now();
       const retryResponse = await ai.models.generateContent({
         model,
         contents: fullPrompt,
       });
+      const retryEnd = Date.now();
 
-      return retryResponse.text?.trim() || "I apologize, but I couldn't generate a response at this time.";
+      const text = retryResponse.text?.trim() || "I couldn't generate a response.";
+      const tokensUsed = text.split(/\s+/).length;
+      const responseTimeMs = retryEnd - retryStart;
+
+      return { text, tokensUsed, responseTimeMs };
     } catch (retryError) {
       console.error("Gemini API Error (Fallback Failed):", retryError);
       throw new Error(

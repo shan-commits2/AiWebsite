@@ -83,49 +83,53 @@ const FINAL_INSTRUCTION = INSTRUCTION + CODING_FOCUS + ADVANCED_CODING_INSTRUCTI
 /**
  * Generate a helpful, human-like chat response.
  */
+const MAX_TOTAL_TOKENS = 300; // max allowed tokens per response
+const MAX_WORDS_PER_LINE = 15; // max words per line
+const MAX_RETRIES = 3;
+
+function tooManyWordsPerLine(text: string) {
+  const lines = text.split(/\r?\n/);
+  return lines.some(line => line.trim().split(/\s+/).length > MAX_WORDS_PER_LINE);
+}
+
 export async function generateChatResponse(
   message: string,
   model: string = "gemini-1.5-flash"
 ): Promise<{ text: string; tokensUsed: number; responseTimeMs: number }> {
   const fullPrompt = FINAL_INSTRUCTION + "\nUser: " + message;
 
-  const startTime = Date.now();
-  try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: fullPrompt,
-    });
-    const endTime = Date.now();
-
-    const text = response.text?.trim() || "I couldn't generate a response.";
-    const tokensUsed = text.split(/\s+/).length;
-    const responseTimeMs = endTime - startTime;
-
-    return { text, tokensUsed, responseTimeMs };
-  } catch (error) {
-    console.error("Gemini API Error (Backup Key Failed):", error);
-
+  let retries = 0;
+  while (retries < MAX_RETRIES) {
+    const startTime = Date.now();
     try {
-      await fallbackAI();
-      const retryStart = Date.now();
-      const retryResponse = await ai.models.generateContent({
+      const response = await ai.models.generateContent({
         model,
         contents: fullPrompt,
       });
-      const retryEnd = Date.now();
+      const endTime = Date.now();
 
-      const text = retryResponse.text?.trim() || "I couldn't generate a response.";
+      const text = response.text?.trim() || "I couldn't generate a response.";
       const tokensUsed = text.split(/\s+/).length;
-      const responseTimeMs = retryEnd - retryStart;
+      const responseTimeMs = endTime - startTime;
+
+      if (tokensUsed > MAX_TOTAL_TOKENS || tooManyWordsPerLine(text)) {
+        retries++;
+        continue; // regenerate if too long or lines too wordy
+      }
 
       return { text, tokensUsed, responseTimeMs };
-    } catch (retryError) {
-      console.error("Gemini API Error (Fallback Failed):", retryError);
-      throw new Error(
-        `Failed to generate AI response: ${retryError instanceof Error ? retryError.message : "Unknown error"}`
-      );
+    } catch (error) {
+      console.error("Gemini API Error (Backup Key Failed):", error);
+
+      try {
+        await fallbackAI();
+        retries++;
+      } catch {
+        throw new Error("Failed to switch API keys.");
+      }
     }
   }
+  throw new Error("Failed to generate a response meeting length constraints after retries.");
 }
 
 /**

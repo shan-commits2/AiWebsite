@@ -80,7 +80,7 @@ You adapt your coding style to the user's preferences (e.g., no comments).
 const FINAL_INSTRUCTION = INSTRUCTION + CODING_FOCUS + ADVANCED_CODING_INSTRUCTIONS + NO_COMMENTS_RULE;
 
 const MAX_TOTAL_TOKENS = 2000;
-const MAX_WORDS_PER_LINE = 100;
+const MAX_WORDS_PER_LINE = 50;
 const MAX_RETRIES = 3;
 
 function tooManyWordsPerLine(text: string) {

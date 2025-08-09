@@ -7,46 +7,30 @@
   </head>
   <body>
     <div id="root"></div>
-
-    <!-- Session ID Setup -->
     <script>
-      // Create a sessionId if one doesn't exist
       if (!localStorage.getItem('sessionId')) {
         localStorage.setItem('sessionId', crypto.randomUUID());
       }
       const sessionId = localStorage.getItem('sessionId');
       window.sessionId = sessionId;
-
-      // Wrap fetch to inject sessionId into all requests
       const originalFetch = window.fetch;
       window.fetch = async (input, init = {}) => {
         let url = typeof input === "string" ? input : input.url;
+        init.headers = init.headers || {};
         const method = (init.method || "GET").toUpperCase();
-
-        // Always include sessionId — body for JSON, query param otherwise
-        if (["GET"].includes(method)) {
-          const urlObj = new URL(url, window.location.origin);
-          urlObj.searchParams.set("sessionId", sessionId);
-          url = urlObj.toString();
-        } 
-        else if (["POST", "PATCH", "DELETE"].includes(method)) {
-          // If sending JSON body
-          if (init.headers && init.headers["Content-Type"] === "application/json") {
-            const body = init.body ? JSON.parse(init.body) : {};
-            body.sessionId = sessionId;
-            init.body = JSON.stringify(body);
-          } else {
-            // If no JSON body, attach sessionId as query param
-            const urlObj = new URL(url, window.location.origin);
-            urlObj.searchParams.set("sessionId", sessionId);
-            url = urlObj.toString();
+        if (url.startsWith("/api")) {
+          init.headers["X-Session-Id"] = sessionId;
+          if (["POST","PATCH","DELETE"].includes(method)) {
+            if (init.headers["Content-Type"] === "application/json") {
+              const body = init.body ? JSON.parse(init.body) : {};
+              body.sessionId = sessionId;
+              init.body = JSON.stringify(body);
+            }
           }
         }
-
         return originalFetch(url, init);
       };
     </script>
-
     <script type="module" src="/src/main.tsx"></script>
     <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>
   </body>

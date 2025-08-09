@@ -132,7 +132,7 @@ function shouldSearch(message: string): boolean {
 export async function generateChatResponse(
   message: string,
   model: string = "gemini-1.5-flash"
-): Promise<{ text: string; tokensUsed: number; responseTimeMs: number }> {
+): Promise<{ text: string; tokensUsed: number; memoryTokens: number; responseTimeMs: number }> {
 
   let searchResultText = "";
   if (shouldSearch(message)) {
@@ -150,6 +150,8 @@ export async function generateChatResponse(
   const memoryContext = conversationMemory.history.join("\n") + "\n";
 
   const fullPrompt = FINAL_INSTRUCTION + "\n" + memoryContext + "Assistant:";
+
+  const memoryTokens = countTokens(memoryContext);
 
   let retries = 0;
   while (retries < MAX_RETRIES) {
@@ -174,7 +176,7 @@ export async function generateChatResponse(
 
       pruneMemory(conversationMemory.history);
 
-      return { text, tokensUsed, responseTimeMs };
+      return { text, tokensUsed, memoryTokens, responseTimeMs };
     } catch (error) {
       console.error(`Gemini API Error (${usingBackup ? "Backup" : "Default"} Key):`, error);
 

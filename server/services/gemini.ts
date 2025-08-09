@@ -157,7 +157,7 @@ export async function generateConversationTitle(
   model: string = "gemini-1.5-flash"
 ): Promise<string> {
   const prompt =
-    `Generate a short, descriptive title (max 6 words) for a conversation that starts with: "${firstMessage}". Only return the title, nothing else.`;
+    `Generate a short, descriptive title (max 6 words) for a conversation starting with: "${firstMessage}". Return ONLY the title, nothing else.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -165,18 +165,35 @@ export async function generateConversationTitle(
       contents: prompt,
     });
 
-    const title = response.text?.trim() || "New Conversation";
+    if (!response || !response.text) {
+      throw new Error("Empty response from API");
+    }
+
+    const title = response.text.trim();
+    if (!title) throw new Error("Response text is empty");
+
     return title.length > 50 ? title.slice(0, 47) + "..." : title;
+
   } catch (error) {
-    console.error("Gemini Title Error (Backup Key Failed):", error);
+    console.error("Gemini Title Error (Primary Key):", error);
+
     try {
       await fallbackAI();
+
       const retryResponse = await ai.models.generateContent({
         model,
         contents: prompt,
       });
-      const title = retryResponse.text?.trim() || "New Conversation";
-      return title.length > 50 ? title.slice(0, 47) + "..." : title;
+
+      if (!retryResponse || !retryResponse.text) {
+        throw new Error("Empty response from fallback API");
+      }
+
+      const retryTitle = retryResponse.text.trim();
+      if (!retryTitle) throw new Error("Fallback response text is empty");
+
+      return retryTitle.length > 50 ? retryTitle.slice(0, 47) + "..." : retryTitle;
+
     } catch (retryError) {
       console.error("Gemini Title Error (Fallback Failed):", retryError);
       return "New Conversation";

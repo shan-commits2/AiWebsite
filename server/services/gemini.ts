@@ -3,7 +3,6 @@ import { GoogleGenAI } from "@google/genai";
 const DEFAULT_API_KEY = "AIzaSyCFjDmsbbVMA4rQhIiJVuTOYYDajIpIA2w";
 const BACKUP_API_KEY = "AIzaSyCBELEsLuMenKZtj9tMaA1CT1t24zCurRE";
 
-// Start with the backup key
 let ai = new GoogleGenAI({ apiKey: BACKUP_API_KEY });
 
 async function fallbackAI(): Promise<void> {
@@ -77,14 +76,10 @@ You avoid using deprecated or unsafe functions.
 You adapt your coding style to the user's preferences (e.g., no comments).
 `;
 
-
 const FINAL_INSTRUCTION = INSTRUCTION + CODING_FOCUS + ADVANCED_CODING_INSTRUCTIONS + NO_COMMENTS_RULE;
 
-/**
- * Generate a helpful, human-like chat response.
- */
-const MAX_TOTAL_TOKENS = 2000; // max allowed tokens per response
-const MAX_WORDS_PER_LINE = 100; // max words per line
+const MAX_TOTAL_TOKENS = 2000;
+const MAX_WORDS_PER_LINE = 100;
 const MAX_RETRIES = 3;
 
 function tooManyWordsPerLine(text: string) {
@@ -92,11 +87,34 @@ function tooManyWordsPerLine(text: string) {
   return lines.some(line => line.trim().split(/\s+/).length > MAX_WORDS_PER_LINE);
 }
 
+interface Memory {
+  history: string[];
+}
+const MAX_MEMORY_BYTES = 200 * 1024 * 1024;
+
+const conversationMemory: Memory = { history: [] };
+
+function getMemorySizeInBytes(): number {
+  return conversationMemory.history.reduce((acc, msg) => acc + msg.length * 2, 0);
+}
+
+function pruneMemory() {
+  while (getMemorySizeInBytes() > MAX_MEMORY_BYTES && conversationMemory.history.length > 2) {
+    conversationMemory.history.shift();
+  }
+}
+
 export async function generateChatResponse(
   message: string,
   model: string = "gemini-1.5-flash"
 ): Promise<{ text: string; tokensUsed: number; responseTimeMs: number }> {
-  const fullPrompt = FINAL_INSTRUCTION + "\nUser: " + message;
+
+  conversationMemory.history.push(`User: ${message}`);
+  pruneMemory();
+
+  const memoryContext = conversationMemory.history.join("\n") + "\n";
+
+  const fullPrompt = FINAL_INSTRUCTION + "\n" + memoryContext + "Assistant:";
 
   let retries = 0;
   while (retries < MAX_RETRIES) {
@@ -114,13 +132,15 @@ export async function generateChatResponse(
 
       if (tokensUsed > MAX_TOTAL_TOKENS || tooManyWordsPerLine(text)) {
         retries++;
-        continue; // regenerate if too long or lines too wordy
+        continue;
       }
+
+      conversationMemory.history.push(`Assistant: ${text}`);
+      pruneMemory();
 
       return { text, tokensUsed, responseTimeMs };
     } catch (error) {
       console.error("Gemini API Error (Backup Key Failed):", error);
-
       try {
         await fallbackAI();
         retries++;
@@ -132,9 +152,6 @@ export async function generateChatResponse(
   throw new Error("Failed to generate a response meeting length constraints after retries.");
 }
 
-/**
- * Generate a short conversation title.
- */
 export async function generateConversationTitle(
   firstMessage: string,
   model: string = "gemini-1.5-flash"
@@ -152,14 +169,12 @@ export async function generateConversationTitle(
     return title.length > 50 ? title.slice(0, 47) + "..." : title;
   } catch (error) {
     console.error("Gemini Title Error (Backup Key Failed):", error);
-
     try {
       await fallbackAI();
       const retryResponse = await ai.models.generateContent({
         model,
         contents: prompt,
       });
-
       const title = retryResponse.text?.trim() || "New Conversation";
       return title.length > 50 ? title.slice(0, 47) + "..." : title;
     } catch (retryError) {

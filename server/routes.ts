@@ -60,6 +60,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   });
+app.post("/api/conversations/:id/messages", async (req, res) => {
+  try {
+    const conversationId = req.params.id;
+    const messageData = { ...req.body, conversationId, sessionId: req.sessionId };
+    const validatedData = insertMessageSchema.parse(messageData);
+
+    const conversation = await storage.getConversation(conversationId);
+    if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+
+    // Create user message
+    const userMessage = await storage.createMessage(validatedData);
+    await storage.updateConversation(conversationId, { updatedAt: new Date() });
+
+    // Generate AI response (text + tokens + response time)
+    const { text: aiText, tokensUsed, responseTimeMs } = await generateChatResponse(validatedData.content, conversation.model);
+
+    // Create AI message with tokens and response time
+    const aiMessage = await storage.createMessage({
+      conversationId,
+      sessionId: req.sessionId,
+      role: "assistant",
+      content: aiText,
+      tokens: tokensUsed,
+      responseTime: responseTimeMs,
+    });
+
+    // Update usage analytics
+    await storage.recordUsage({
+      conversationsCreated: 0,
+      messagesExchanged: 1,
+      tokensUsed,
+      averageResponseTime: responseTimeMs,
+      modelsUsed: { [conversation.model]: 1 },
+    });
+
+    res.status(201).json({ userMessage, aiMessage });
+  } catch (error) {
+    console.error("Message creation error:", error);
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ message: "Invalid message data", errors: error.errors });
+    } else {
+      res.status(500).json({ message: "Failed to create message" });
+    }
+  }
+});
+
 
   // DELETE conversation
   app.delete("/api/conversations/:id", async (req, res) => {

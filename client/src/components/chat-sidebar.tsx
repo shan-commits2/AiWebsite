@@ -86,7 +86,7 @@ export function ChatSidebar({
           <Menu className="h-5 w-5 text-gray-300" />
         </Button>
         <h1 className="text-lg font-semibold bg-gradient-to-r from-blue-400 to-green-400 bg-clip-text text-transparent">
-          Gemini Chat
+          GemiFlow Chat
         </h1>
         <Button
           variant="ghost"
@@ -111,7 +111,7 @@ export function ChatSidebar({
             </div>
             <div>
               <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-green-400 bg-clip-text text-transparent">
-                Gemini Chat
+                GemiFlow Chat
               </h1>
               <p className="text-xs text-gray-400">Powered by Google AI</p>
             </div>

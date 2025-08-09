@@ -1,4 +1,10 @@
+import express from "express";
 import { GoogleGenAI } from "@google/genai";
+
+const app = express();
+app.use(express.json());
+
+const PORT = process.env.PORT || 3000;
 
 const DEFAULT_API_KEY = "AIzaSyCFjDmsbbVMA4rQhIiJVuTOYYDajIpIA2w";
 const BACKUP_API_KEY = "AIzaSyCBELEsLuMenKZtj9tMaA1CT1t24zCurRE";
@@ -106,7 +112,7 @@ function pruneMemory() {
   }
 }
 
-export async function generateChatResponse(
+async function generateChatResponse(
   message: string,
   model: string = "gemini-1.5-flash"
 ): Promise<{ text: string; tokensUsed: number; responseTimeMs: number }> {
@@ -163,7 +169,7 @@ export async function generateChatResponse(
   throw new Error("Failed to generate a response meeting length constraints after retries.");
 }
 
-export async function generateConversationTitle(
+async function generateConversationTitle(
   firstMessage: string,
   model: string = "gemini-1.5-flash"
 ): Promise<string> {
@@ -211,3 +217,39 @@ export async function generateConversationTitle(
     }
   }
 }
+
+// Express routes
+
+app.post("/chat", async (req, res) => {
+  const { message, model } = req.body;
+  if (!message) {
+    return res.status(400).json({ error: "Missing 'message' in request body" });
+  }
+
+  try {
+    const result = await generateChatResponse(message, model);
+    res.json(result);
+  } catch (error) {
+    console.error("[/chat] Error generating chat response:", error);
+    res.status(500).json({ error: error.message || "Internal Server Error" });
+  }
+});
+
+app.post("/title", async (req, res) => {
+  const { firstMessage, model } = req.body;
+  if (!firstMessage) {
+    return res.status(400).json({ error: "Missing 'firstMessage' in request body" });
+  }
+
+  try {
+    const title = await generateConversationTitle(firstMessage, model);
+    res.json({ title });
+  } catch (error) {
+    console.error("[/title] Error generating conversation title:", error);
+    res.status(500).json({ error: error.message || "Internal Server Error" });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

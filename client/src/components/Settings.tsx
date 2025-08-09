@@ -1,21 +1,16 @@
 import { useState } from "react";
-import { ThemeSelector } from "./theme-selector";
 import { AnalyticsDashboard } from "./analytics-dashboard";
 import { ModelComparison } from "./model-comparison";
-import { GeminiModel, Theme } from "@shared/schema";
+import { GeminiModel } from "@shared/schema";
 import { Button } from "./ui/button";
 
 interface SettingsProps {
-  selectedTheme: Theme;
-  onThemeChange: (theme: Theme) => void;
   selectedModel: GeminiModel;
   onModelChange: (model: GeminiModel) => void;
   onClose: () => void;
 }
 
 export function Settings({
-  selectedTheme,
-  onThemeChange,
   selectedModel,
   onModelChange,
   onClose,
@@ -36,12 +31,6 @@ export function Settings({
         </Button>
 
         <h1 className="text-3xl font-bold mb-6">Settings</h1>
-
-        {/* Theme Selector */}
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold mb-2">Theme</h2>
-          <ThemeSelector selectedTheme={selectedTheme} onThemeChange={onThemeChange} />
-        </section>
 
         {/* Toggle between Analytics and Model Comparison */}
         <section className="mb-8">
@@ -82,7 +71,6 @@ export function Settings({
             )}
           </div>
         </section>
-
       </div>
     </div>
   );

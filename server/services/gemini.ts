@@ -6,6 +6,7 @@ const BACKUP_API_KEY = "AIzaSyCBELEsLuMenKZtj9tMaA1CT1t24zCurRE";
 let ai = new GoogleGenAI({ apiKey: BACKUP_API_KEY });
 
 async function fallbackAI(): Promise<void> {
+  console.log("[fallbackAI] Switching to DEFAULT_API_KEY");
   ai = new GoogleGenAI({ apiKey: DEFAULT_API_KEY });
 }
 
@@ -100,7 +101,8 @@ function getMemorySizeInBytes(): number {
 
 function pruneMemory() {
   while (getMemorySizeInBytes() > MAX_MEMORY_BYTES && conversationMemory.history.length > 2) {
-    conversationMemory.history.shift();
+    const removed = conversationMemory.history.shift();
+    console.log(`[pruneMemory] Removed from memory: ${removed?.slice(0, 50)}...`);
   }
 }
 
@@ -108,18 +110,18 @@ export async function generateChatResponse(
   message: string,
   model: string = "gemini-1.5-flash"
 ): Promise<{ text: string; tokensUsed: number; responseTimeMs: number }> {
-
+  console.log(`[generateChatResponse] User message received: "${message}"`);
   conversationMemory.history.push(`User: ${message}`);
   pruneMemory();
 
   const memoryContext = conversationMemory.history.join("\n") + "\n";
-
   const fullPrompt = FINAL_INSTRUCTION + "\n" + memoryContext + "Assistant:";
 
   let retries = 0;
   while (retries < MAX_RETRIES) {
     const startTime = Date.now();
     try {
+      console.log(`[generateChatResponse] Sending prompt to API (attempt ${retries + 1})...`);
       const response = await ai.models.generateContent({
         model,
         contents: fullPrompt,
@@ -130,7 +132,15 @@ export async function generateChatResponse(
       const tokensUsed = text.split(/\s+/).length;
       const responseTimeMs = endTime - startTime;
 
-      if (tokensUsed > MAX_TOTAL_TOKENS || tooManyWordsPerLine(text)) {
+      console.log(`[generateChatResponse] Received response in ${responseTimeMs}ms, tokens used: ${tokensUsed}`);
+
+      if (tokensUsed > MAX_TOTAL_TOKENS) {
+        console.warn(`[generateChatResponse] Response tokens (${tokensUsed}) exceed max allowed (${MAX_TOTAL_TOKENS}), retrying...`);
+        retries++;
+        continue;
+      }
+      if (tooManyWordsPerLine(text)) {
+        console.warn(`[generateChatResponse] Response has too many words in one line, retrying...`);
         retries++;
         continue;
       }
@@ -140,11 +150,12 @@ export async function generateChatResponse(
 
       return { text, tokensUsed, responseTimeMs };
     } catch (error) {
-      console.error("Gemini API Error (Backup Key Failed):", error);
+      console.error("[generateChatResponse] Gemini API Error:", error);
       try {
         await fallbackAI();
         retries++;
-      } catch {
+      } catch (fallbackError) {
+        console.error("[generateChatResponse] Failed to switch API keys:", fallbackError);
         throw new Error("Failed to switch API keys.");
       }
     }
@@ -156,46 +167,46 @@ export async function generateConversationTitle(
   firstMessage: string,
   model: string = "gemini-1.5-flash"
 ): Promise<string> {
+  console.log(`[generateConversationTitle] Generating title for: "${firstMessage}"`);
   const prompt =
     `Generate a short, descriptive title (max 6 words) for a conversation starting with: "${firstMessage}". Return ONLY the title, nothing else.`;
 
   try {
+    console.log("[generateConversationTitle] Sending prompt to API (primary key)...");
     const response = await ai.models.generateContent({
       model,
       contents: prompt,
     });
 
-    if (!response || !response.text) {
-      throw new Error("Empty response from API");
+    if (!response || typeof response.text !== "string" || response.text.trim() === "") {
+      throw new Error("Empty or invalid text in response");
     }
 
     const title = response.text.trim();
-    if (!title) throw new Error("Response text is empty");
-
+    console.log(`[generateConversationTitle] Title received: "${title}"`);
     return title.length > 50 ? title.slice(0, 47) + "..." : title;
 
   } catch (error) {
-    console.error("Gemini Title Error (Primary Key):", error);
+    console.error("[generateConversationTitle] Error with primary key:", error);
 
     try {
       await fallbackAI();
-
+      console.log("[generateConversationTitle] Retrying with fallback key...");
       const retryResponse = await ai.models.generateContent({
         model,
         contents: prompt,
       });
 
-      if (!retryResponse || !retryResponse.text) {
-        throw new Error("Empty response from fallback API");
+      if (!retryResponse || typeof retryResponse.text !== "string" || retryResponse.text.trim() === "") {
+        throw new Error("Empty or invalid text in fallback response");
       }
 
       const retryTitle = retryResponse.text.trim();
-      if (!retryTitle) throw new Error("Fallback response text is empty");
-
+      console.log(`[generateConversationTitle] Title received on fallback: "${retryTitle}"`);
       return retryTitle.length > 50 ? retryTitle.slice(0, 47) + "..." : retryTitle;
 
     } catch (retryError) {
-      console.error("Gemini Title Error (Fallback Failed):", retryError);
+      console.error("[generateConversationTitle] Fallback key failed:", retryError);
       return "New Conversation";
     }
   }

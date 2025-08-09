@@ -83,7 +83,7 @@ const FINAL_INSTRUCTION = INSTRUCTION + CODING_FOCUS + ADVANCED_CODING_INSTRUCTI
 /**
  * Generate a helpful, human-like chat response.
  */
-const MAX_TOTAL_TOKENS = 300; // max allowed tokens per response
+const MAX_TOTAL_TOKENS = 2000; // max allowed tokens per response
 const MAX_WORDS_PER_LINE = 15; // max words per line
 const MAX_RETRIES = 3;
 

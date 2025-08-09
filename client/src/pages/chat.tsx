@@ -174,7 +174,7 @@ export default function Chat() {
                     <MessageSquare className="h-10 w-10 text-white" />
                   </div>
                   <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-green-400 bg-clip-text text-transparent">
-                    Welcome to Gemini Chat
+                    Welcome to GemiFlow
                   </h2>
                   <p className="text-gray-400 text-lg mb-8">Start a conversation and experience the power of Google AI</p>
                   <div className="flex flex-wrap justify-center gap-3 text-sm text-gray-500">

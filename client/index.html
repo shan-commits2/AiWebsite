@@ -10,25 +10,21 @@
 
     <!-- Session ID Setup -->
     <script>
-      // Generate a sessionId if not already stored
       if (!localStorage.getItem('sessionId')) {
         localStorage.setItem('sessionId', crypto.randomUUID());
       }
       const sessionId = localStorage.getItem('sessionId');
       window.sessionId = sessionId;
 
-      // Patch fetch to automatically include sessionId
       const originalFetch = window.fetch;
       window.fetch = async (input, init = {}) => {
         let url = typeof input === "string" ? input : input.url;
 
-        // Add sessionId to GET requests as query param
         if (!init.method || init.method.toUpperCase() === "GET") {
           const urlObj = new URL(url, window.location.origin);
           urlObj.searchParams.set("sessionId", sessionId);
           url = urlObj.toString();
         } 
-        // Add sessionId to POST/PATCH/DELETE requests in JSON body
         else if (init.method && ["POST", "PATCH", "DELETE"].includes(init.method.toUpperCase())) {
           if (init.headers && init.headers["Content-Type"] === "application/json") {
             const body = init.body ? JSON.parse(init.body) : {};
@@ -41,7 +37,6 @@
       };
     </script>
 
-    <!-- Your app entry -->
     <script type="module" src="/src/main.tsx"></script>
     <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>
   </body>

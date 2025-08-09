@@ -8,9 +8,6 @@ import { type Conversation, GEMINI_MODELS, type GeminiModel } from "@shared/sche
 import { ModelSelector } from "@/components/model-selector";
 import { cn } from "@/lib/utils";
 
-// Import Settings modal
-import { Settings as SettingsModal } from "./Settings";
-
 interface ChatSidebarProps {
   selectedConversationId?: string;
   onSelectConversation: (conversationId: string) => void;
@@ -31,8 +28,6 @@ export function ChatSidebar({
   onModelChange
 }: ChatSidebarProps) {
   const queryClient = useQueryClient();
-
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const { data: conversations = [], isLoading } = useQuery<Conversation[]>({
     queryKey: ["/api/conversations"],
@@ -79,10 +74,6 @@ export function ChatSidebar({
 
   return (
     <>
-      {/* Settings Modal */}
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-
-      {/* Mobile header */}
       <div className="md:hidden bg-gray-800/95 backdrop-blur-sm border-b border-gray-700/50 p-4 flex items-center justify-between shadow-lg">
         <Button
           variant="ghost"
@@ -106,13 +97,11 @@ export function ChatSidebar({
         </Button>
       </div>
 
-      {/* Sidebar */}
       <div className={cn(
         "bg-gray-800/95 backdrop-blur-sm border-r border-gray-700/50 flex flex-col transition-all duration-300 shadow-xl",
         "md:flex md:w-72",
         isOpen ? "flex" : "hidden"
       )}>
-        {/* Desktop Header */}
         <div className="hidden md:block p-6 border-b border-gray-700/50">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-green-500 rounded-xl flex items-center justify-center shadow-lg">
@@ -127,12 +116,11 @@ export function ChatSidebar({
           </div>
         </div>
         
-        {/* New Chat Button & Model Selector */}
         <div className="p-4 space-y-3">
           <Button 
             onClick={handleNewChat}
             disabled={createConversationMutation.isPending}
-            className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white border-none justify-start shadow-lg hover:shadow-xl transition-all duration-[...]
+            className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white border-none justify-start shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
             variant="outline"
           >
             <Plus className="h-4 w-4 mr-3" />
@@ -149,7 +137,6 @@ export function ChatSidebar({
           </div>
         </div>
         
-        {/* Conversations List */}
         <ScrollArea className="flex-1 px-3">
           <div className="space-y-1">
             {isLoading ? (
@@ -202,7 +189,6 @@ export function ChatSidebar({
           </div>
         </ScrollArea>
         
-        {/* User Profile */}
         <div className="p-4 border-t border-gray-700/50 bg-gray-800/50">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center shadow-lg">
@@ -215,12 +201,7 @@ export function ChatSidebar({
                 <span>Online</span>
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors"
-              onClick={() => setSettingsOpen(true)}
-            >
+            <Button variant="ghost" size="sm" className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors">
               <Settings className="h-4 w-4 text-gray-400" />
             </Button>
           </div>

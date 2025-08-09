@@ -16,6 +16,7 @@ interface ChatSidebarProps {
   onToggle: () => void;
   selectedModel: GeminiModel;
   onModelChange: (model: GeminiModel) => void;
+  onOpenSettings: () => void;
 }
 
 export function ChatSidebar({ 
@@ -25,7 +26,8 @@ export function ChatSidebar({
   isOpen,
   onToggle,
   selectedModel,
-  onModelChange
+  onModelChange,
+  onOpenSettings
 }: ChatSidebarProps) {
   const queryClient = useQueryClient();
 
@@ -201,7 +203,7 @@ export function ChatSidebar({
                 <span>Online</span>
               </p>
             </div>
-            <Button variant="ghost" size="sm" className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors">
+            <Button variant="ghost" size="sm" className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors" onClick={onOpenSettings}>
               <Settings className="h-4 w-4 text-gray-400" />
             </Button>
           </div>
